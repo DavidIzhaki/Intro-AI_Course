@@ -1,0 +1,1450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uninformed Search Lab</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#f3f5f9; --panel:#ffffff; --border:#e1e5ed; --text:#1d2330; --muted:#69728a;
+  --accent:#1e6edc; --accent-soft:#e8f1fd;
+  --fr:#ece3fb; --fr-b:#8b63d6;
+  --cl:#dfe3ea; --cl-b:#7f8796;
+  --cur:#ffefd0; --cur-b:#f08c00;
+  --ok:#cdeedb; --ok-b:#1e9e57;
+  --bad:#d64545;
+  --kw:#1e6edc; --op:#138a4b; --fn:#7c3aed; --cm:#8a909c;
+  --fs:15px;
+}
+html{font-size:var(--fs)}
+body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .9rem;padding:.55rem .9rem;background:#fff;border-bottom:1px solid var(--border)}
+.brand{font-weight:750;font-size:1.05rem;display:flex;align-items:center;gap:.5rem;margin-right:.3rem}
+.brand .dot{width:.75rem;height:.75rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.group{display:flex;align-items:center;gap:.45rem}
+.lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.spacer{flex:1}
+button,select,input{font:inherit;color:var(--text)}
+.btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:.3rem .65rem;cursor:pointer;white-space:nowrap;font-size:.88rem}
+.btn:hover:not(:disabled){background:#eef2f8}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:650}
+.btn.primary:hover:not(:disabled){background:#185fc0}
+select{border:1px solid var(--border);border-radius:8px;padding:.28rem .45rem;background:#fff;font-size:.88rem;max-width:15rem}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:#fff}
+.seg button{border:0;background:transparent;padding:.3rem .8rem;font-weight:650;cursor:pointer;font-size:.9rem}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--accent);color:#fff}
+.seg.small button{padding:.22rem .6rem;font-size:.8rem;font-weight:600}
+.switch{display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:650;font-size:.9rem;user-select:none}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{width:2.5rem;height:1.4rem;border-radius:1rem;background:#cdd3de;position:relative;transition:background .15s}
+.switch .track::after{content:"";position:absolute;top:.17rem;left:.17rem;width:1.06rem;height:1.06rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.switch input:checked + .track{background:var(--bad)}
+.switch input:checked + .track::after{left:1.27rem}
+.switch input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(23rem,30rem);gap:.7rem;padding:.7rem}
+.left,.right{min-height:0;display:flex;flex-direction:column;gap:.7rem}
+.right{overflow:auto}
+.panel[hidden]{display:none!important}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.phead{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .55rem;padding:.42rem .7rem;border-bottom:1px solid var(--border);font-size:.88rem}
+.phead .title{font-weight:720}
+.phead .meta{margin-left:auto;color:var(--muted);font-size:.78rem}
+.playbar{padding:.5rem .6rem;gap:.45rem;flex:none}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+.controls .speed{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--muted);margin-left:.3rem}
+.controls input[type=range]{width:6rem}
+.stepno{font-size:.8rem;color:var(--muted);margin-left:auto}
+.status{font-size:1.02rem;line-height:1.4;padding:.45rem .75rem;border-radius:8px;background:#f2f6fc;border-left:4px solid var(--accent);min-height:2.5rem}
+.status.ok{background:#e8f8ee;border-color:var(--ok-b)}
+.status.bad{background:#fdeeee;border-color:var(--bad)}
+.status.warn{background:#fff5df;border-color:var(--cur-b)}
+.gpanel{flex:1.3}
+.tpanel{flex:1}
+.left.only-graph .tpanel{display:none}
+.left.only-tree .gpanel{display:none}
+.cwrap{position:relative;flex:1;min-height:0}
+.cwrap svg{position:absolute;inset:0;width:100%;height:100%;display:block;font-family:inherit;user-select:none;-webkit-user-select:none}
+#graph{touch-action:none}
+#graph .node{cursor:pointer}
+#graph.mode-move .node{cursor:grab}
+#graph.mode-node{cursor:copy}
+#graph.mode-delete .node,#graph.mode-delete .edge,#graph.mode-delete .elabel{cursor:not-allowed}
+#graph .edge,#graph .elabel{cursor:pointer}
+.hint{position:absolute;left:.6rem;bottom:.45rem;font-size:.78rem;color:var(--muted);background:rgba(255,255,255,.9);padding:.15rem .5rem;border-radius:6px;pointer-events:none;max-width:calc(100% - 1.2rem)}
+.hint.err{color:var(--bad);font-weight:650}
+.inline-ed{position:absolute;width:4.8rem;font-size:.95rem;padding:.2rem .35rem;border:2px solid var(--accent);border-radius:6px;text-align:center;z-index:5;background:#fff}
+.tools{display:inline-flex;gap:.22rem;flex-wrap:wrap}
+.tool{border:1px solid var(--border);background:#fff;border-radius:7px;padding:.2rem .5rem;font-size:.8rem;cursor:pointer}
+.tool:hover{background:#eef2f8}
+.tool.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:650}
+.chk{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:.25rem 1rem;padding:.1rem .25rem;font-size:.76rem;color:var(--muted);flex:none}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.sw{width:.85rem;height:.85rem;border-radius:50%;border:2px solid;display:inline-block}
+
+.code-head{background:#ebf4ff;color:var(--accent)}
+.code{font-family:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;font-size:.8rem;line-height:1.62;padding:.35rem 0;overflow:auto;border-left:4px solid var(--accent);background:#fafcff;max-height:58vh}
+.ln{display:flex;white-space:pre;padding-right:.6rem;min-width:max-content;transition:background .12s}
+.ln .no{flex:0 0 2.5em;text-align:right;padding-right:.9em;color:#a5adbc;user-select:none}
+.ln.cl{background:#fff2f2}
+.ln.cl .no{color:var(--bad)}
+.ln.hl{background:#ffe7b0}
+.ln.hl .no{color:#a35f00;font-weight:700}
+.tk-kw{color:var(--kw);font-weight:650}.tk-op{color:var(--op);font-weight:700}.tk-fn{color:var(--fn)}.tk-cm{color:var(--cm);font-style:italic}.tk-k{color:#b4235a;font-weight:650}
+
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;padding:1.15rem .7rem .55rem;min-height:3.9rem;align-items:flex-end}
+.chip{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:2.6rem;padding:.18rem .5rem;border-radius:8px;border:2px solid var(--fr-b);background:var(--fr);font-weight:750;line-height:1.15}
+.chip small{font-weight:500;font-size:.66rem;color:#596178}
+.chip.closed{border-color:var(--cl-b);background:var(--cl)}
+.chip.next{box-shadow:0 0 0 3px #ffd27a}
+.chip.next::before{content:"next";position:absolute;top:-1.05rem;font-size:.6rem;color:#a35f00;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.chip.new{border-color:var(--accent)}
+.chips .empty{color:var(--muted);font-size:.85rem;font-style:italic;align-self:center}
+.closed-chips{padding-top:.55rem;min-height:2.9rem}
+.logp{flex:1;min-height:9rem}
+.log{list-style:none;margin:0;padding:.3rem 0;overflow:auto;flex:1;font-size:.8rem}
+.log li{padding:.2rem .7rem;cursor:pointer;display:flex;gap:.5rem;line-height:1.35}
+.log li:hover{background:#f2f5fa}
+.log li.cur{background:#fff1d0}
+.log li b{color:var(--muted);font-weight:600;min-width:1.9rem;text-align:right;flex:none}
+
+.modal{position:fixed;inset:0;background:rgba(20,26,40,.38);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem}
+.modal[hidden]{display:none}
+.mbox{background:#fff;border-radius:14px;max-width:56rem;width:100%;max-height:90vh;overflow:auto;padding:1.1rem 1.3rem;box-shadow:0 20px 50px rgba(0,0,0,.22)}
+.mbox h3{margin:.1rem 0 .6rem;font-size:1.15rem}
+.mbox p{margin:.4rem 0;line-height:1.45;font-size:.92rem}
+.mbox code{background:#f1f4f9;padding:.05rem .3rem;border-radius:4px}
+.mrow{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.8rem}
+textarea{width:100%;height:17rem;font-family:ui-monospace,Consolas,monospace;font-size:.9rem;border:1px solid var(--border);border-radius:8px;padding:.6rem;resize:vertical}
+.err{color:var(--bad);font-size:.88rem;min-height:1.2rem;margin-top:.3rem}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:.45rem .6rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+td.best{color:var(--ok-b);font-weight:750}
+.kbd{display:inline-block;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:0 .35rem;font-size:.8rem;background:#fafbfd}
+.helpgrid{display:grid;grid-template-columns:1fr 1fr;gap:.2rem 1.5rem}
+@media (max-width:1050px){
+  body{overflow:auto;height:auto}
+  main{grid-template-columns:1fr}
+  .gpanel{height:27rem;flex:none}.tpanel{height:22rem;flex:none}
+  .right{overflow:visible}.log{max-height:16rem}
+  .helpgrid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span>Uninformed Search Lab</div>
+  <div class="group">
+    <div class="seg" id="algoSeg" title="Algorithm">
+      <button data-algo="BFS" class="on">BFS</button><button data-algo="DFS">DFS</button><button data-algo="IDS">IDS</button><button data-algo="UCS">UCS</button>
+    </div>
+  </div>
+  <label class="switch" title="Duplicate detection: never expand the same state twice"><input type="checkbox" id="closedT"><span class="track"></span>CLOSED list</label>
+  <div class="group"><span class="lbl" title="Order in which successors are generated">Order</span>
+    <select id="orderSel"><option value="lr">left → right</option><option value="alpha">alphabetical</option></select>
+  </div>
+  <div class="group"><span class="lbl">Example</span><select id="presetSel"></select></div>
+  <span class="spacer"></span>
+  <button class="btn" id="bCompare" title="Run all four algorithms on this graph">Compare all</button>
+  <div class="group" style="gap:.25rem">
+    <button class="btn" id="fMinus" title="Smaller text">A−</button>
+    <button class="btn" id="fPlus" title="Bigger text">A+</button>
+    <button class="btn" id="bHelp" title="Help">?</button>
+  </div>
+</header>
+
+<main>
+  <section class="left" id="left">
+    <div class="panel playbar">
+      <div class="controls">
+        <button class="btn" id="bReset" title="Reset (R)">⟲ Reset</button>
+        <button class="btn" id="bBack" title="Back (←)">◀ Back</button>
+        <button class="btn primary" id="bStep" title="Step (→)">Step ▶</button>
+        <button class="btn" id="bNext" title="Jump to the next pop (Shift + →)">Next pop ⏭</button>
+        <button class="btn" id="bPlay" title="Play / pause (Space)">▶ Play</button>
+        <button class="btn" id="bEnd" title="Run to the end (End)">Run to end ⏩</button>
+        <label class="speed">speed <input type="range" id="speed" min="1" max="10" value="5"></label>
+        <span class="stepno" id="stepNo"></span>
+        <div class="seg small" id="viewSeg" title="What to show">
+          <button data-view="graph">Graph</button><button data-view="both" class="on">Both</button><button data-view="tree">Tree</button>
+        </div>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="panel gpanel">
+      <div class="phead">
+        <span class="title">State-space graph</span>
+        <div class="tools" id="tools">
+          <button class="tool" data-mode="move" title="Move nodes (V)">✥ Move</button>
+          <button class="tool" data-mode="node" title="Add a node (N)">＋ Node</button>
+          <button class="tool" data-mode="edge" title="Add a directed edge (E)">→ Edge</button>
+          <button class="tool" data-mode="start" title="Set the start state (S)">Start</button>
+          <button class="tool" data-mode="goal" title="Mark / unmark goal states (G)">Goal</button>
+          <button class="tool" data-mode="delete" title="Delete nodes or edges (D)">✕ Delete</button>
+        </div>
+        <span class="meta" style="display:flex;gap:.45rem;align-items:center">
+          <label class="chk"><input type="checkbox" id="costsT" checked>costs</label>
+          <button class="tool" id="bText" title="Edit the graph as an edge list">Edit as text</button>
+          <button class="tool" id="bLayout" title="Arrange nodes in layers from the start">Auto layout</button>
+          <button class="tool" id="bFit" title="Zoom to fit the graph">⤢ Fit</button>
+          <button class="tool" id="bUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+        </span>
+      </div>
+      <div class="cwrap" id="gwrap">
+        <svg id="graph" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hint" id="hint"></div>
+        <input class="inline-ed" id="inlineEd" hidden>
+      </div>
+    </div>
+
+    <div class="panel tpanel">
+      <div class="phead"><span class="title">Search tree</span><span class="meta" id="treeInfo"></span></div>
+      <div class="cwrap"><svg id="tree" preserveAspectRatio="xMidYMin meet"></svg></div>
+    </div>
+
+    <div class="legend">
+      <span><i class="sw" style="background:#fff;border-color:#9aa3b2"></i>not reached</span>
+      <span><i class="sw" style="background:var(--fr);border-color:var(--fr-b)"></i>in frontier</span>
+      <span><i class="sw" style="background:var(--cl);border-color:var(--cl-b)"></i>expanded / in CLOSED</span>
+      <span><i class="sw" style="background:var(--cur);border-color:var(--cur-b)"></i>current (popped)</span>
+      <span><i class="sw" style="background:var(--ok);border-color:var(--ok-b)"></i>solution</span>
+      <span><i class="sw" style="background:#fff;border-color:var(--bad);border-style:dashed"></i>skipped duplicate</span>
+      <span><i class="sw" style="background:#f4f5f7;border-color:#9aa3b2;border-style:dashed"></i>cut off (IDS)</span>
+      <span><b style="color:#fff;background:var(--bad);border-radius:9px;padding:0 .3rem;font-size:.7rem">×2</b>expanded twice</span>
+      <span><b style="color:#fff;background:var(--accent);border-radius:9px;padding:0 .3rem;font-size:.7rem">3</b>expansion order</span>
+      <span><b style="color:var(--bad)">→</b>start · <i class="sw" style="border-color:var(--ok-b);box-shadow:0 0 0 2px #fff,0 0 0 4px var(--ok-b)"></i>goal</span>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="panel">
+      <div class="phead code-head"><span class="title" id="codeTitle">Pseudocode</span><span class="meta" id="codeMeta"></span></div>
+      <div class="code" id="code"></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><span class="title" id="frTitle">Frontier</span><span class="meta" id="frMeta"></span></div>
+      <div class="chips" id="frontier"></div>
+      <div class="phead" style="border-top:1px solid var(--border);border-bottom:0;padding-top:.3rem;padding-bottom:.35rem"><span class="meta" id="stats" style="margin-left:0"></span></div>
+    </div>
+    <div class="panel" id="closedPanel" hidden>
+      <div class="phead"><span class="title">CLOSED</span><span class="meta" id="clMeta"></span></div>
+      <div class="chips closed-chips" id="closed"></div>
+    </div>
+    <div class="panel logp">
+      <div class="phead"><span class="title">Log</span><span class="meta">click a line to jump there</span></div>
+      <ol class="log" id="log"></ol>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="textModal" hidden><div class="mbox">
+  <h3>Edit the graph as text</h3>
+  <p>One directed edge per line: <code>FROM TO COST</code> (the cost is optional, default 1).
+     Also: <code>start A</code>, <code>goal G H</code>, and <code>node X</code> for a node without edges. Lines starting with <code>#</code> are comments.</p>
+  <textarea id="textArea" spellcheck="false"></textarea>
+  <div class="err" id="textErr"></div>
+  <div class="mrow"><button class="btn" id="textCancel">Cancel</button><button class="btn primary" id="textApply">Apply</button></div>
+</div></div>
+
+<div class="modal" id="cmpModal" hidden><div class="mbox">
+  <h3 id="cmpTitle">Compare all algorithms</h3>
+  <div id="cmpBody"></div>
+  <div class="mrow"><button class="btn primary" id="cmpClose">Close</button></div>
+</div></div>
+
+<div class="modal" id="helpModal" hidden><div class="mbox">
+  <h3>How to use</h3>
+  <div class="helpgrid">
+    <div>
+      <p><b>Build a graph</b></p>
+      <p>Pick a ready-made graph from <b>Example</b>, or build your own with the tools above the graph:</p>
+      <p>＋ <b>Node</b>: click on empty space. <br>→ <b>Edge</b>: click the source node, then the target node, and type the cost.<br>
+         <b>Start</b> / <b>Goal</b>: click a node. <b>Delete</b>: click a node or an edge.<br>
+         <b>Double-click</b> a node to rename it, or an edge to change its cost.<br>
+         <b>Edit as text</b> lets you type the whole graph as an edge list.</p>
+    </div>
+    <div>
+      <p><b>Run</b></p>
+      <p><span class="kbd">→</span> step &nbsp; <span class="kbd">←</span> back &nbsp; <span class="kbd">Shift</span>+<span class="kbd">→</span> next pop<br>
+         <span class="kbd">Space</span> play / pause &nbsp; <span class="kbd">End</span> run to end &nbsp; <span class="kbd">R</span> reset</p>
+      <p><b>Notes</b></p>
+      <p>BFS and DFS test the goal when a node is <i>generated</i>. UCS and IDS test it when a node is <i>popped</i>.</p>
+      <p>Successors are generated <b>left → right</b> by their position in the drawing (or alphabetically). DFS pushes them in this order, so the right-most one is popped first.</p>
+      <p>Turn on the <b>CLOSED list</b> to see how duplicate detection stops the search from expanding the same state again and again (try “DFS cycle trap” and “Cycle, no solution”).</p>
+    </div>
+  </div>
+  <div class="mrow"><button class="btn primary" id="helpClose">Close</button></div>
+</div></div>
+
+<script>
+"use strict";
+(() => {
+const SVGNS = "http://www.w3.org/2000/svg";
+const W = 1000, H = 560, RAD = 24;
+const CAP = 150, IDS_CAP = 1500, LIMIT_CAP = 20;
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  if (attrs) for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function hEl(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+const fmt = (c) => (Math.round(c * 1000) / 1000).toString();
+
+/* ================= Presets ================= */
+function cubePreset() {
+  const nodes = [["000",250,190],["100",470,190],["010",250,390],["110",470,390],
+                 ["001",400,80],["101",620,80],["011",400,280],["111",620,280]];
+  const edges = [];
+  const names = nodes.map(n => n[0]);
+  for (const a of names) for (const b of names) {
+    let diff = 0; for (let i = 0; i < 3; i++) if (a[i] !== b[i]) diff++;
+    if (diff === 1) edges.push([a, b, 1]);
+  }
+  return { key:"cube", title:"3 students (3-bit hypercube)", costs:false, start:"001", goals:["100","101","110","111"], nodes, edges };
+}
+const PRESETS = [
+  { key:"lecture", title:"Lecture example (A–G)", costs:false, start:"A", goals:["G"],
+    nodes:[["A",450,60],["B",290,160],["C",610,160],["H",450,260],["L",290,370],["K",610,370],["G",790,370]],
+    edges:[["A","B"],["A","C"],["B","H"],["B","L"],["C","H"],["C","K"],["H","L"],["H","C"],["K","G"]] },
+  { key:"compare", title:"Same graph, different answers", costs:true, start:"S", goals:["G"],
+    nodes:[["S",450,50],["A",220,150],["D",450,150],["E",680,150],["B",220,270],["F",680,240],["H",680,330],["G",450,410]],
+    edges:[["S","A",1],["S","D",5],["S","E",3],["A","B",1],["B","G",2],["D","G",6],["E","F",3],["F","H",3],["H","G",3]] },
+  { key:"ucs", title:"UCS example (weighted)", costs:true, start:"a", goals:["G"],
+    nodes:[["a",450,60],["b",290,170],["c",610,170],["f",190,290],["G",450,290],["e",740,290]],
+    edges:[["a","b",2],["a","c",1],["b","f",1],["b","G",2],["c","G",8],["c","e",2]] },
+  { key:"trap", title:"DFS cycle trap", costs:false, start:"S", goals:["G"],
+    nodes:[["S",450,60],["A",300,180],["B",600,180],["G",300,310],["C",600,310]],
+    edges:[["S","A"],["S","B"],["A","G"],["B","C"],["C","B"]] },
+  { key:"nosol", title:"Cycle, no solution", costs:false, start:"S", goals:["G"],
+    nodes:[["S",450,60],["A",300,170],["B",600,170],["C",450,290],["G",760,290]],
+    edges:[["S","A"],["S","B"],["A","C"],["B","C"],["C","S"],["G","C"]] },
+  cubePreset(),
+  { key:"empty", title:"Empty canvas (build your own)", costs:true, start:null, goals:[], nodes:[], edges:[] },
+];
+
+/* ================= App state ================= */
+const S = {
+  g: { nodes: [], edges: [], start: null, goals: [] }, nextId: 1,
+  algo: "BFS", closed: false, order: "lr", showCosts: true, presetKey: "lecture",
+  mode: "move", edgeSrc: null, view: "both", undo: [], fs: 15,
+  vb: [0, 0, W, H], run: null, k: -1, timer: null, drag: null, last: { kind: null, id: null, t: 0 }, edit: null,
+};
+const LS = "uninformed-search-lab-v1";
+function save() {
+  try {
+    localStorage.setItem(LS, JSON.stringify({ g: S.g, nextId: S.nextId, algo: S.algo, closed: S.closed,
+      order: S.order, showCosts: S.showCosts, presetKey: S.presetKey, fs: S.fs, view: S.view }));
+  } catch (e) { /* storage unavailable */ }
+}
+function restore() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS) || "null");
+    if (!d || !d.g || !Array.isArray(d.g.nodes) || !Array.isArray(d.g.edges)) return false;
+    S.g = { nodes: d.g.nodes, edges: d.g.edges, start: d.g.start ?? null, goals: Array.isArray(d.g.goals) ? d.g.goals : [] };
+    S.nextId = d.nextId || 1 + Math.max(0, ...S.g.nodes.map(n => n.id), ...S.g.edges.map(e => e.id));
+    if (["BFS","DFS","IDS","UCS"].includes(d.algo)) S.algo = d.algo;
+    S.closed = !!d.closed; S.order = d.order === "alpha" ? "alpha" : "lr";
+    S.showCosts = d.showCosts !== false; S.presetKey = d.presetKey || "custom";
+    if (d.fs >= 11 && d.fs <= 22) S.fs = d.fs;
+    if (["graph","both","tree"].includes(d.view)) S.view = d.view;
+    return true;
+  } catch (e) { return false; }
+}
+function loadPreset(key) {
+  const p = PRESETS.find(x => x.key === key); if (!p) return;
+  const g = { nodes: [], edges: [], start: null, goals: [] }; let id = 1; const by = {};
+  for (const [n, x, y] of p.nodes) { g.nodes.push({ id, name: n, x, y }); by[n] = id++; }
+  for (const [a, b, c] of p.edges) g.edges.push({ id: id++, from: by[a], to: by[b], cost: c == null ? 1 : c });
+  g.start = p.start != null ? by[p.start] : null;
+  g.goals = (p.goals || []).map(n => by[n]);
+  S.g = g; S.nextId = id; S.presetKey = key; S.showCosts = p.costs !== false; S.edgeSrc = null;
+}
+const nodeById = (id) => S.g.nodes.find(n => n.id === id);
+
+/* ================= Frozen problem for a run ================= */
+function freeze() {
+  const g = S.g, byId = {}, names = {};
+  g.nodes.forEach(n => { byId[n.id] = n; names[n.id] = n.name; });
+  const succ = {}; g.nodes.forEach(n => succ[n.id] = []);
+  g.edges.forEach(e => { if (byId[e.from] && byId[e.to]) succ[e.from].push({ edge: e.id, to: e.to, cost: e.cost }); });
+  const cmp = S.order === "alpha"
+    ? (a, b) => byId[a.to].name.localeCompare(byId[b.to].name, undefined, { numeric: true })
+    : (a, b) => (byId[a.to].x - byId[b.to].x) || (byId[a.to].y - byId[b.to].y) || byId[a.to].name.localeCompare(byId[b.to].name);
+  for (const k in succ) succ[k].sort(cmp);
+  return {
+    succ, start: g.start, goals: new Set(g.goals), name: (id) => names[id],
+    orderLabel: S.order === "alpha" ? "alphabetical" : "left → right",
+    sig: JSON.stringify(Object.keys(succ).map(k => [k, succ[k].map(x => x.edge)])),
+  };
+}
+function hasCycle(F) {
+  if (F.start == null) return false;
+  const c = {}; const st = [{ v: F.start, i: 0 }]; c[F.start] = 1;
+  while (st.length) {
+    const top = st[st.length - 1], sc = F.succ[top.v] || [];
+    if (top.i < sc.length) {
+      const w = sc[top.i++].to;
+      if (c[w] === 1) return true;
+      if (!c[w]) { c[w] = 1; st.push({ v: w, i: 0 }); }
+    } else { c[top.v] = 2; st.pop(); }
+  }
+  return false;
+}
+
+/* ================= Search engine (generators that yield events) ================= */
+const T = (R) => R.events.length;
+function mk(R, state, parent, edge, cost, iter) {
+  const n = { id: R.tree.length, state, parent: parent ? parent.id : null, edge,
+    g: parent ? parent.g + cost : 0, d: parent ? parent.d + 1 : 0, iter,
+    created: T(R), popped: null, expanded: null, skipped: null, cut: null, goal: null, order: null };
+  R.tree.push(n); R.stats.gen++;
+  return n;
+}
+function pathIds(R, n) { const p = []; while (n) { p.push(n.id); n = n.parent == null ? null : R.tree[n.parent]; } return p.reverse(); }
+function pathTxt(R, ids) { return ids.map(i => R.F.name(R.tree[i].state)).join(" → "); }
+function succText(R, sc) {
+  if (!sc.length) return "It has no successors.";
+  return `Successors (${R.F.orderLabel}): ${sc.map(x => R.F.name(x.to)).join(", ")}.`;
+}
+function E(R, o) {
+  const fr = o.frontier || [];
+  if (fr.length > R.stats.maxF) R.stats.maxF = fr.length;
+  let closed = null;
+  if (o.closed) closed = o.closed instanceof Map ? [...o.closed.entries()] : [...o.closed].map(s => [s, null]);
+  return { type: o.type, msg: o.msg, lines: (o.lines || []).filter(Boolean),
+    cur: o.cur ?? null, edge: o.edge ?? null, newNode: o.newNode ?? null,
+    frontier: fr.map(n => n.id), closed, iter: o.iter || 0, limit: o.limit ?? null,
+    final: !!o.final, result: o.result || null, path: o.path || null, stats: { ...R.stats } };
+}
+function stopEv(R, o, ids) {
+  const cyc = hasCycle(R.F);
+  let msg = ids ? `Stopped at depth limit ${o.limit} (safety limit of this tool).`
+                : `Stopped after ${R.stats.gen} generated nodes (safety limit of this tool).`;
+  if (!R.closed && cyc) msg += ids
+    ? " Without CLOSED, the cycle keeps every iteration cut off, so IDS would raise the limit forever."
+    : " The graph has a cycle and there is no CLOSED list, so the search keeps revisiting the same states — it would run forever. Turn CLOSED on and try again.";
+  return E(R, { ...o, type: "stop", msg, lines: [], final: true, result: "stopped" });
+}
+
+function* genBasic(R, lifo) {
+  const F = R.F, N = F.name, C = R.closed, s0 = F.start;
+  const fr = [], closed = new Set(), DS = lifo ? "stack" : "queue";
+  const root = mk(R, s0, null, null, 0, 0);
+  if (F.goals.has(s0)) {
+    root.popped = root.goal = T(R);
+    yield E(R, { type: "found", msg: `The start state ${N(s0)} is already a goal → return the empty solution.`,
+      lines: ["g0", "r0"], cur: root.id, frontier: fr, closed, final: true, result: "found", path: [root.id] });
+    return;
+  }
+  fr.push(root);
+  yield E(R, { type: "init", msg: `${N(s0)} is not a goal. Create the root node ${N(s0)} and push it into the ${DS}.`,
+    lines: ["g0", "q", "push0", C && "cl0"], frontier: fr, closed, newNode: root.id });
+  while (fr.length) {
+    const sg = lifo ? fr.pop() : fr.shift(), st = sg.state;
+    sg.popped = T(R);
+    if (C && closed.has(st)) {
+      sg.skipped = T(R);
+      yield E(R, { type: "pop", msg: `Pop ${N(st)}. ${N(st)} is already in CLOSED → skip it (duplicate).`,
+        lines: ["wh", "pop", "clif"], cur: sg.id, frontier: fr, closed });
+      continue;
+    }
+    if (C) closed.add(st);
+    sg.expanded = T(R); sg.order = ++R.expOrder; R.stats.exp++;
+    const sc = F.succ[st];
+    yield E(R, { type: "pop",
+      msg: `Pop ${N(st)} from the ${lifo ? "top of the stack" : "front of the queue"}${C ? " and add it to CLOSED" : ""}. ${succText(R, sc)}`,
+      lines: ["wh", "pop", C && "clif", C && "cladd", "for"], cur: sg.id, frontier: fr, closed });
+    for (const x of sc) {
+      if (R.stats.gen >= CAP) { yield stopEv(R, { frontier: fr, closed, cur: sg.id }); return; }
+      const ch = mk(R, x.to, sg, x.edge, x.cost, 0);
+      if (F.goals.has(x.to)) {
+        ch.goal = T(R); const p = pathIds(R, ch);
+        yield E(R, { type: "found",
+          msg: `Generate ${N(x.to)} from ${N(st)} — it is a goal! Return ${pathTxt(R, p)} (depth ${ch.d}, cost ${fmt(ch.g)}).`,
+          lines: ["mk", "gt", "ret"], cur: sg.id, edge: x.edge, newNode: ch.id, frontier: fr, closed, final: true, result: "found", path: p });
+        return;
+      }
+      fr.push(ch);
+      yield E(R, { type: "gen",
+        msg: `Generate ${N(x.to)} from ${N(st)}. Not a goal → push it ${lifo ? "on top of the stack" : "to the back of the queue"}.`,
+        lines: ["mk", "gt", "push"], cur: sg.id, edge: x.edge, newNode: ch.id, frontier: fr, closed });
+    }
+  }
+  yield E(R, { type: "end", msg: `The ${DS} is empty → return unsolvable (no goal is reachable).`,
+    lines: ["uns"], frontier: fr, closed, final: true, result: "unsolvable" });
+}
+
+function* genUCS(R) {
+  const F = R.F, N = F.name, C = R.closed, s0 = F.start;
+  const fr = [], closed = new Set();
+  const push = (n) => { let i = fr.length; while (i > 0 && fr[i - 1].g > n.g) i--; fr.splice(i, 0, n); };
+  const root = mk(R, s0, null, null, 0, 0); push(root);
+  yield E(R, { type: "init", msg: `Create OPEN (a priority queue ordered by g) and push the root ${N(s0)} with g = 0.`,
+    lines: ["open", C && "cl0", "push0"], frontier: fr, closed, newNode: root.id });
+  while (fr.length) {
+    const sg = fr.shift(), st = sg.state;
+    sg.popped = T(R);
+    if (F.goals.has(st)) {
+      sg.goal = T(R); const p = pathIds(R, sg);
+      yield E(R, { type: "found",
+        msg: `Pop ${N(st)} (smallest g = ${fmt(sg.g)}). It is a goal → return ${pathTxt(R, p)} (cost ${fmt(sg.g)}). With non-negative costs this is optimal.`,
+        lines: ["wh", "pop", "gt", "ret"], cur: sg.id, frontier: fr, closed, final: true, result: "found", path: p });
+      return;
+    }
+    if (C && closed.has(st)) {
+      sg.skipped = T(R);
+      yield E(R, { type: "pop",
+        msg: `Pop ${N(st)} (g = ${fmt(sg.g)}). Not a goal. ${N(st)} is already in CLOSED (it was expanded with a smaller or equal g) → skip it.`,
+        lines: ["wh", "pop", "gt", "clif"], cur: sg.id, frontier: fr, closed });
+      continue;
+    }
+    if (C) closed.add(st);
+    sg.expanded = T(R); sg.order = ++R.expOrder; R.stats.exp++;
+    const sc = F.succ[st];
+    yield E(R, { type: "pop",
+      msg: `Pop ${N(st)} (smallest g = ${fmt(sg.g)}). Not a goal${C ? ", add it to CLOSED" : ""}. ${succText(R, sc)}`,
+      lines: ["wh", "pop", "gt", C && "clif", C && "cladd", "for"], cur: sg.id, frontier: fr, closed });
+    for (const x of sc) {
+      if (R.stats.gen >= CAP) { yield stopEv(R, { frontier: fr, closed, cur: sg.id }); return; }
+      const ch = mk(R, x.to, sg, x.edge, x.cost, 0); push(ch);
+      yield E(R, { type: "gen",
+        msg: `Generate ${N(x.to)} from ${N(st)}: g = ${fmt(sg.g)} + ${fmt(x.cost)} = ${fmt(ch.g)} → push it into OPEN.`,
+        lines: ["mk", "push"], cur: sg.id, edge: x.edge, newNode: ch.id, frontier: fr, closed });
+    }
+  }
+  yield E(R, { type: "end", msg: "OPEN is empty → return unsolvable (no goal is reachable).",
+    lines: ["uns"], frontier: fr, closed, final: true, result: "unsolvable" });
+}
+
+function* genIDS(R) {
+  const F = R.F, N = F.name, C = R.closed, s0 = F.start;
+  for (let limit = 0; ; limit++) {
+    if (limit > LIMIT_CAP) { yield stopEv(R, { limit: limit - 1, iter: limit - 1 }, true); return; }
+    const iter = limit, fr = [], closed = new Map(); let cutoff = false;
+    const root = mk(R, s0, null, null, 0, iter); fr.push(root);
+    yield E(R, { type: "iter", msg: `New iteration: limit = ${limit}. Run DFS-L from ${N(s0)} — push ⟨${N(s0)}, 0⟩.`,
+      lines: [limit === 0 ? "lim0" : null, "loop", "call", "st", "push0", "cut0", C && "cl0"],
+      frontier: fr, closed, iter, limit, newNode: root.id });
+    while (fr.length) {
+      const sg = fr.pop(), st = sg.state, d = sg.d;
+      sg.popped = T(R);
+      if (F.goals.has(st)) {
+        sg.goal = T(R); const p = pathIds(R, sg);
+        yield E(R, { type: "found",
+          msg: `Pop ⟨${N(st)}, d=${d}⟩. It is a goal → FOUND. IDS returns ${pathTxt(R, p)} (depth ${d}, cost ${fmt(sg.g)}).`,
+          lines: ["pop", "gt", "ret", "found"], cur: sg.id, frontier: fr, closed, iter, limit, final: true, result: "found", path: p });
+        return;
+      }
+      if (C && closed.has(st) && closed.get(st) <= d) {
+        sg.skipped = T(R);
+        yield E(R, { type: "pop",
+          msg: `Pop ⟨${N(st)}, d=${d}⟩. Not a goal. ${N(st)} was already reached at depth ${closed.get(st)} ≤ ${d} → skip it.`,
+          lines: ["pop", "gt", "clif"], cur: sg.id, frontier: fr, closed, iter, limit });
+        continue;
+      }
+      if (C) closed.set(st, d);
+      const sc = F.succ[st];
+      if (d < limit) {
+        sg.expanded = T(R); sg.order = ++R.expOrder; R.stats.exp++;
+        yield E(R, { type: "pop",
+          msg: `Pop ⟨${N(st)}, d=${d}⟩. Not a goal${C ? `, closed[${N(st)}] = ${d}` : ""}. d < limit → expand. ${succText(R, sc)}`,
+          lines: ["pop", "gt", C && "clif", C && "cladd", "dl", "for"], cur: sg.id, frontier: fr, closed, iter, limit });
+        for (const x of sc) {
+          if (R.stats.gen >= IDS_CAP) { yield stopEv(R, { frontier: fr, closed, cur: sg.id, iter, limit }, true); return; }
+          const ch = mk(R, x.to, sg, x.edge, x.cost, iter); fr.push(ch);
+          yield E(R, { type: "gen", msg: `Generate ${N(x.to)} from ${N(st)} → push ⟨${N(x.to)}, ${d + 1}⟩ on the stack.`,
+            lines: ["for", "push"], cur: sg.id, edge: x.edge, newNode: ch.id, frontier: fr, closed, iter, limit });
+        }
+      } else if (sc.length) {
+        cutoff = true; sg.cut = T(R);
+        yield E(R, { type: "pop",
+          msg: `Pop ⟨${N(st)}, d=${d}⟩. Not a goal. d = limit → do not expand. ${N(st)} has successors → cutoff = true.`,
+          lines: ["pop", "gt", C && "clif", C && "cladd", "dl", "else", "cutt"], cur: sg.id, frontier: fr, closed, iter, limit });
+      } else {
+        yield E(R, { type: "pop",
+          msg: `Pop ⟨${N(st)}, d=${d}⟩. Not a goal. d = limit, but ${N(st)} has no successors → nothing was cut off here.`,
+          lines: ["pop", "gt", C && "clif", C && "cladd", "dl", "else"], cur: sg.id, frontier: fr, closed, iter, limit });
+      }
+    }
+    if (!cutoff) {
+      yield E(R, { type: "end",
+        msg: "The stack is empty and no node was cut off → the whole reachable space was searched: unsolvable.",
+        lines: ["retL", "unsI"], frontier: fr, closed, iter, limit, final: true, result: "unsolvable" });
+      return;
+    }
+    yield E(R, { type: "cut", msg: `The stack is empty, but some nodes were cut off → CUTOFF. Increase the limit to ${limit + 1}.`,
+      lines: ["retL", "inc"], frontier: fr, closed, iter, limit });
+  }
+}
+const GENS = { BFS: (R) => genBasic(R, false), DFS: (R) => genBasic(R, true), IDS: genIDS, UCS: genUCS };
+
+function newRun(algo, closed, F) {
+  const R = { algo, closed, F, tree: [], events: [], done: false, stats: { gen: 0, exp: 0, maxF: 0 }, expOrder: 0 };
+  R.it = GENS[algo](R);
+  return R;
+}
+function pull(R) {
+  if (R.done) return false;
+  const r = R.it.next();
+  if (r.done) { R.done = true; return false; }
+  R.events.push(r.value);
+  if (r.value.final) R.done = true;
+  return true;
+}
+function ensure(R, k) { while (R.events.length <= k && pull(R)); return Math.min(k, R.events.length - 1); }
+function nodeStatus(n, k) {
+  if (n.goal != null && n.goal <= k) return "goal";
+  if (n.skipped != null && n.skipped <= k) return "skipped";
+  if (n.cut != null && n.cut <= k) return "cut";
+  if (n.expanded != null && n.expanded <= k) return "expanded";
+  if (n.popped != null && n.popped <= k) return "expanded";
+  return "frontier";
+}
+
+/* ================= Pseudocode ================= */
+const CODE = {
+  BFS: (C) => [
+    ["fn", 0, "function BFS(s₀):"],
+    ["g0", 1, "if is_goal(s₀):"],
+    ["r0", 2, "return extract_solution(make_root_node(s₀))"],
+    ["q", 1, "queue ← new FIFO-queue"],
+    ["push0", 1, "queue.push(make_root_node(s₀))"],
+    C && ["cl0", 1, "closed ← ∅"],
+    ["wh", 1, "while not queue.empty():"],
+    ["pop", 2, "σ ← queue.pop()"],
+    C && ["clif", 2, "if state(σ) ∉ closed:"],
+    C && ["cladd", 3, "closed ← closed ∪ {state(σ)}"],
+    ["for", 2 + C, "for each ⟨o, s⟩ in successors(state(σ)):"],
+    ["mk", 3 + C, "σ' ← make_node(σ, o, s)"],
+    ["gt", 3 + C, "if is_goal(state(σ')):"],
+    ["ret", 4 + C, "return extract_solution(σ')"],
+    ["push", 3 + C, "queue.push(σ')"],
+    ["uns", 1, "return unsolvable"],
+  ],
+  DFS: (C) => [
+    ["fn", 0, "function DFS(s₀):"],
+    ["g0", 1, "if is_goal(s₀):"],
+    ["r0", 2, "return extract_solution(make_root_node(s₀))"],
+    ["q", 1, "stack ← new LIFO-stack"],
+    ["push0", 1, "stack.push(make_root_node(s₀))"],
+    C && ["cl0", 1, "closed ← ∅"],
+    ["wh", 1, "while not stack.empty():"],
+    ["pop", 2, "σ ← stack.pop()"],
+    C && ["clif", 2, "if state(σ) ∉ closed:"],
+    C && ["cladd", 3, "closed ← closed ∪ {state(σ)}"],
+    ["for", 2 + C, "for each ⟨o, s⟩ in successors(state(σ)):"],
+    ["mk", 3 + C, "σ' ← make_node(σ, o, s)"],
+    ["gt", 3 + C, "if is_goal(state(σ')):"],
+    ["ret", 4 + C, "return extract_solution(σ')"],
+    ["push", 3 + C, "stack.push(σ')"],
+    ["uns", 1, "return unsolvable"],
+  ],
+  UCS: (C) => [
+    ["fn", 0, "function UCS(s₀):"],
+    ["open", 1, "OPEN ← priority_queue ordered by g(σ)   // min-heap"],
+    C && ["cl0", 1, "CLOSED ← ∅"],
+    ["push0", 1, "OPEN.push(make_root_node(s₀))"],
+    ["wh", 1, "while not OPEN.empty():"],
+    ["pop", 2, "σ ← OPEN.pop_min()          // smallest g"],
+    ["gt", 2, "if is_goal(state(σ)):"],
+    ["ret", 3, "return extract_solution(σ)"],
+    C && ["clif", 2, "if state(σ) ∉ CLOSED:"],
+    C && ["cladd", 3, "CLOSED ← CLOSED ∪ {state(σ)}"],
+    ["for", 2 + C, "for each ⟨o, s⟩ in successors(state(σ)):"],
+    ["mk", 3 + C, "σ' ← make_node(σ, o, s)"],
+    ["push", 3 + C, "OPEN.push(σ')"],
+    ["uns", 1, "return unsolvable"],
+  ],
+  IDS: (C) => [
+    ["fn", 0, "function IDS(s₀):"],
+    ["lim0", 1, "limit ← 0"],
+    ["loop", 1, "while true:"],
+    ["call", 2, "result ← DFS_L(s₀, limit)"],
+    ["found", 2, "if result = FOUND: return solution"],
+    ["unsI", 2, "if result = UNSOLVABLE: return unsolvable"],
+    ["inc", 2, "limit ← limit + 1        // result = CUTOFF"],
+    ["sp", 0, ""],
+    ["fnL", 0, "function DFS_L(s₀, limit):"],
+    ["st", 1, "stack ← new LIFO-stack"],
+    ["push0", 1, "stack.push(⟨make_root_node(s₀), 0⟩)"],
+    ["cut0", 1, "cutoff ← false"],
+    C && ["cl0", 1, "closed ← ∅          // state → depth"],
+    ["wh", 1, "while not stack.empty():"],
+    ["pop", 2, "⟨σ, d⟩ ← stack.pop()"],
+    ["gt", 2, "if is_goal(state(σ)):"],
+    ["ret", 3, "return FOUND, extract_solution(σ)"],
+    C && ["clif", 2, "if state(σ) ∉ closed or closed[state(σ)] > d:"],
+    C && ["cladd", 3, "closed[state(σ)] ← d"],
+    ["dl", 2 + C, "if d < limit:"],
+    ["for", 3 + C, "for each ⟨o, s⟩ in successors(state(σ)):"],
+    ["push", 4 + C, "stack.push(⟨make_node(σ, o, s), d + 1⟩)"],
+    ["else", 2 + C, "else if successors(state(σ)) ≠ ∅:"],
+    ["cutt", 3 + C, "cutoff ← true"],
+    ["retL", 1, "return CUTOFF if cutoff else UNSOLVABLE"],
+  ],
+};
+const KW = new Set(["function","if","else","while","for","each","in","return","not","or","and","true","false","new","continue"]);
+const CONSTS = new Set(["FOUND","CUTOFF","UNSOLVABLE","unsolvable"]);
+function colorize(text, parent) {
+  let code = text, cm = "";
+  const ci = text.indexOf("//");
+  if (ci >= 0) { code = text.slice(0, ci); cm = text.slice(ci); }
+  const re = /([A-Za-z_][A-Za-z0-9_]*)|(←|∪|∈|∉|≠|≤|≥|=|<|>|\+)|([^A-Za-z_←∪∈∉≠≤≥=<>+]+)/g;
+  let m;
+  while ((m = re.exec(code))) {
+    if (m[1]) {
+      const w = m[1], rest = code.slice(re.lastIndex);
+      let cls = null;
+      if (KW.has(w)) cls = "tk-kw"; else if (CONSTS.has(w)) cls = "tk-k"; else if (/^\s*\(/.test(rest)) cls = "tk-fn";
+      parent.append(cls ? hEl("span", cls, w) : document.createTextNode(w));
+    } else if (m[2]) parent.append(hEl("span", "tk-op", m[2]));
+    else parent.append(document.createTextNode(m[3]));
+  }
+  if (cm) parent.append(hEl("span", "tk-cm", cm));
+}
+function renderCode() {
+  const box = $("#code"); box.textContent = "";
+  const lines = CODE[S.algo](S.closed ? 1 : 0).filter(Boolean);
+  lines.forEach(([id, ind, text], i) => {
+    const ln = hEl("div", "ln"); ln.dataset.id = id;
+    if (id.startsWith("cl")) ln.classList.add("cl");
+    ln.append(hEl("span", "no", text ? String(i + 1) : ""));
+    const t = hEl("span", "tx"); t.style.paddingLeft = (ind * 2) + "ch";
+    colorize(text, t); ln.append(t); box.append(ln);
+  });
+  $("#codeTitle").textContent = `${S.algo} — Pseudocode`;
+  $("#codeMeta").textContent = S.closed ? "red lines = CLOSED list" : "";
+}
+function highlightCode(ev) {
+  const box = $("#code");
+  box.querySelectorAll(".ln.hl").forEach(l => l.classList.remove("hl"));
+  if (!ev) return;
+  let first = null;
+  for (const id of ev.lines) {
+    const l = box.querySelector(`.ln[data-id="${id}"]`);
+    if (l) { l.classList.add("hl"); if (!first) first = l; }
+  }
+  if (first) {
+    const top = first.offsetTop - box.offsetTop, bottom = top + first.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top - 8;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + 8;
+  }
+}
+
+/* ================= Rendering: shared view state ================= */
+function viewState() {
+  const R = S.run, k = S.k;
+  const ev = R && k >= 0 ? R.events[k] : null;
+  const st = {}; S.g.nodes.forEach(n => st[n.id] = { front: 0, exp: 0, found: false });
+  const usedEdges = new Set(); let vis = [];
+  if (ev) {
+    const fset = new Set(ev.frontier);
+    vis = R.tree.filter(n => n.created <= k && n.iter === ev.iter);
+    for (const n of vis) {
+      if (n.edge != null) usedEdges.add(n.edge);
+      const s = st[n.state]; if (!s) continue;
+      const ns = nodeStatus(n, k);
+      if (fset.has(n.id)) s.front++;
+      if (ns === "expanded" && n.expanded != null) s.exp++;
+      if (ns === "goal") s.found = true;
+      if (ns === "cut" || ns === "skipped") s.reached = true;
+    }
+  }
+  return { R, k, ev, st, usedEdges, vis };
+}
+const NSTY = {
+  idle:   { f: "#ffffff", s: "#9aa3b2", w: 2 },
+  front:  { f: "#ece3fb", s: "#8b63d6", w: 2.5 },
+  closed: { f: "#dfe3ea", s: "#7f8796", w: 2.5 },
+  cur:    { f: "#ffefd0", s: "#f08c00", w: 4 },
+  found:  { f: "#cdeedb", s: "#1e9e57", w: 3 },
+  skipped:{ f: "#ffffff", s: "#d64545", w: 2, dash: "4 3" },
+  cut:    { f: "#f4f5f7", s: "#9aa3b2", w: 2, dash: "4 3" },
+};
+const ECOL = { idle: "#b3bac8", used: "#4b5568", hot: "#f08c00", path: "#1e9e57", start: "#d64545", prev: "#1e6edc" };
+const EW = { idle: 2, used: 2.4, hot: 4.5, path: 4.5 };
+
+/* ================= Graph view ================= */
+const gsvg = $("#graph");
+(function initGraphSvg() {
+  const defs = svgEl("defs", null, gsvg);
+  for (const k in ECOL) {
+    const m = svgEl("marker", { id: "gm-" + k, viewBox: "0 0 10 10", refX: 0.5, refY: 5, markerWidth: 12, markerHeight: 12,
+      markerUnits: "userSpaceOnUse", orient: "auto" }, defs);
+    svgEl("path", { d: "M0,0.6 L10,5 L0,9.4 z", fill: ECOL[k] }, m);
+  }
+  const pat = svgEl("pattern", { id: "dots", width: 25, height: 25, patternUnits: "userSpaceOnUse" }, defs);
+  svgEl("circle", { cx: 1.5, cy: 1.5, r: 1.3, fill: "#e3e7ee" }, pat);
+  svgEl("rect", { x: -3000, y: -3000, width: 7000, height: 7000, fill: "url(#dots)", "data-bg": 1 }, gsvg);
+})();
+const gLayer = svgEl("g", null, gsvg);
+const prevLine = svgEl("line", { stroke: ECOL.prev, "stroke-width": 2.5, "stroke-dasharray": "6 5", "marker-end": "url(#gm-prev)", "pointer-events": "none", visibility: "hidden" }, gsvg);
+
+function unit(x, y) { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; }
+function edgeGeo(a, b, curved, goalEnd) {
+  const [ux, uy] = unit(b.x - a.x, b.y - a.y);
+  let cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+  if (curved) { cx += -uy * 34; cy += ux * 34; }
+  const s1 = unit(cx - a.x, cy - a.y), s2 = unit(b.x - cx, b.y - cy);
+  const endR = RAD + (goalEnd ? 6 : 1) + 12;
+  const sx = a.x + s1[0] * RAD, sy = a.y + s1[1] * RAD;
+  const ex = b.x - s2[0] * endR, ey = b.y - s2[1] * endR;
+  const d = curved ? `M${sx} ${sy} Q${cx} ${cy} ${ex} ${ey}` : `M${sx} ${sy} L${ex} ${ey}`;
+  const lx = curved ? 0.25 * sx + 0.5 * cx + 0.25 * ex : (sx + ex) / 2;
+  const ly = curved ? 0.25 * sy + 0.5 * cy + 0.25 * ey : (sy + ey) / 2;
+  return { d, lx, ly };
+}
+function fitGraphView() {
+  const ns = S.g.nodes;
+  if (!ns.length) { S.vb = [0, 0, W, H]; return; }
+  let x0 = Math.min(...ns.map(n => n.x)) - 75, x1 = Math.max(...ns.map(n => n.x)) + 55;
+  let y0 = Math.min(...ns.map(n => n.y)) - 50, y1 = Math.max(...ns.map(n => n.y)) + 78;
+  if (x1 - x0 < 380) { const c = (x0 + x1) / 2; x0 = c - 190; x1 = c + 190; }
+  if (y1 - y0 < 260) { const c = (y0 + y1) / 2; y0 = c - 130; y1 = c + 130; }
+  S.vb = [x0, y0, x1 - x0, y1 - y0];
+}
+function labelPos(e) {
+  const a = nodeById(e.from), b = nodeById(e.to);
+  const pairs = new Set(S.g.edges.map(x => x.from + ">" + x.to));
+  return edgeGeo(a, b, pairs.has(e.to + ">" + e.from), S.g.goals.includes(b.id));
+}
+
+function renderGraph(V) {
+  V = V || viewState();
+  const { R, ev, st, usedEdges } = V;
+  gLayer.textContent = "";
+  gsvg.setAttribute("class", "mode-" + S.mode);
+  gsvg.setAttribute("viewBox", S.vb.join(" "));
+  const byId = {}; S.g.nodes.forEach(n => byId[n.id] = n);
+  const goals = new Set(S.g.goals);
+  const pairs = new Set(S.g.edges.map(e => e.from + ">" + e.to));
+  const pathStates = new Set(), pathEdges = new Set();
+  if (ev && ev.path) for (const id of ev.path) { const n = R.tree[id]; pathStates.add(n.state); if (n.edge != null) pathEdges.add(n.edge); }
+  const closedSet = new Set(ev && ev.closed ? ev.closed.map(c => c[0]) : []);
+  const curState = ev && ev.cur != null && !ev.final ? R.tree[ev.cur].state : null;
+
+  const eL = svgEl("g", null, gLayer), lL = svgEl("g", null, gLayer), nL = svgEl("g", null, gLayer);
+  for (const e of S.g.edges) {
+    const a = byId[e.from], b = byId[e.to]; if (!a || !b) continue;
+    const geo = edgeGeo(a, b, pairs.has(e.to + ">" + e.from), goals.has(b.id));
+    let kind = "idle";
+    if (pathEdges.has(e.id)) kind = "path";
+    else if (ev && ev.edge === e.id) kind = "hot";
+    else if (usedEdges.has(e.id)) kind = "used";
+    const grp = svgEl("g", { "data-edge": e.id, class: "edge" }, eL);
+    svgEl("path", { d: geo.d, stroke: "transparent", "stroke-width": 16, fill: "none" }, grp);
+    svgEl("path", { d: geo.d, stroke: ECOL[kind], "stroke-width": EW[kind], fill: "none", "marker-end": `url(#gm-${kind})` }, grp);
+    if (S.showCosts) {
+      const lg = svgEl("g", { "data-edge": e.id, class: "elabel" }, lL);
+      const txt = fmt(e.cost), w = 14 + txt.length * 8.5;
+      const col = kind === "idle" ? "#4b5568" : ECOL[kind];
+      svgEl("rect", { x: geo.lx - w / 2, y: geo.ly - 11.5, width: w, height: 23, rx: 7, fill: "#fff",
+        stroke: kind === "idle" ? "#d3d9e3" : ECOL[kind], "stroke-width": 1.3 }, lg);
+      svgEl("text", { x: geo.lx, y: geo.ly + 5, "text-anchor": "middle", "font-size": 14.5, "font-weight": 700, fill: col }, lg).textContent = txt;
+    }
+  }
+  for (const n of S.g.nodes) {
+    const s = st[n.id] || { front: 0, exp: 0 };
+    let kind = "idle";
+    if (pathStates.has(n.id) || s.found) kind = "found";
+    else if (curState === n.id) kind = "cur";
+    else if (R && R.closed && closedSet.has(n.id)) kind = "closed";
+    else if (s.front > 0) kind = "front";
+    else if (s.exp > 0 || s.reached) kind = "closed";
+    const sty = NSTY[kind];
+    const grp = svgEl("g", { "data-node": n.id, class: "node" }, nL);
+    if (goals.has(n.id)) svgEl("circle", { cx: n.x, cy: n.y, r: RAD + 5.5, fill: "#fff", stroke: "#1e9e57", "stroke-width": 2.5 }, grp);
+    if (S.edgeSrc === n.id) svgEl("circle", { cx: n.x, cy: n.y, r: RAD + 11, fill: "none", stroke: ECOL.prev, "stroke-width": 2.2, "stroke-dasharray": "5 4" }, grp);
+    svgEl("circle", { cx: n.x, cy: n.y, r: RAD, fill: sty.f, stroke: sty.s, "stroke-width": sty.w }, grp);
+    const fs = n.name.length <= 2 ? 17 : n.name.length === 3 ? 14 : 11.5;
+    svgEl("text", { x: n.x, y: n.y + fs * 0.36, "text-anchor": "middle", "font-size": fs, "font-weight": 750, fill: "#1d2330", "pointer-events": "none" }, grp).textContent = n.name;
+    if (s.exp >= 2) {
+      const bx = n.x + RAD * 0.8, by = n.y - RAD * 0.8;
+      svgEl("rect", { x: bx - 13, y: by - 10, width: 26, height: 20, rx: 10, fill: "#d64545" }, grp);
+      svgEl("text", { x: bx, y: by + 4.5, "text-anchor": "middle", "font-size": 12, "font-weight": 750, fill: "#fff", "pointer-events": "none" }, grp).textContent = "×" + s.exp;
+      svgEl("title", null, grp).textContent = `${n.name} was expanded ${s.exp} times`;
+    }
+  }
+  if (S.g.start != null && byId[S.g.start]) {
+    const n = byId[S.g.start], sg = svgEl("g", { "pointer-events": "none" }, nL);
+    const goalPad = goals.has(n.id) ? 6 : 0;
+    if (n.x - RAD - 60 > 0) {
+      svgEl("line", { x1: n.x - RAD - goalPad - 46, y1: n.y, x2: n.x - RAD - goalPad - 14, y2: n.y, stroke: ECOL.start, "stroke-width": 3, "marker-end": "url(#gm-start)" }, sg);
+      svgEl("text", { x: n.x - RAD - goalPad - 30, y: n.y - 9, "text-anchor": "middle", "font-size": 12, "font-weight": 700, fill: ECOL.start }, sg).textContent = "start";
+    } else {
+      svgEl("line", { x1: n.x, y1: n.y - RAD - goalPad - 44, x2: n.x, y2: n.y - RAD - goalPad - 14, stroke: ECOL.start, "stroke-width": 3, "marker-end": "url(#gm-start)" }, sg);
+      svgEl("text", { x: n.x + 8, y: n.y - RAD - goalPad - 34, "font-size": 12, "font-weight": 700, fill: ECOL.start }, sg).textContent = "start";
+    }
+  }
+}
+
+/* ================= Tree view ================= */
+const tsvg = $("#tree");
+function renderTree(V) {
+  V = V || viewState();
+  const { R, k, ev, vis } = V;
+  tsvg.textContent = "";
+  const info = $("#treeInfo");
+  if (!ev) {
+    tsvg.setAttribute("viewBox", "0 0 600 200");
+    svgEl("text", { x: 300, y: 90, "text-anchor": "middle", "font-size": 15, fill: "#9aa3b2" }, tsvg).textContent = "The search tree grows here — every node is a path from the start.";
+    info.textContent = "";
+    return;
+  }
+  const kids = {}; vis.forEach(n => kids[n.id] = []);
+  let root = null;
+  vis.forEach(n => { if (n.parent == null) root = n; else if (kids[n.parent]) kids[n.parent].push(n); });
+  if (!root) return;
+  let leaf = 0, maxD = 0; const pos = {};
+  (function lay(n) {
+    const c = kids[n.id]; maxD = Math.max(maxD, n.d);
+    if (!c.length) pos[n.id] = leaf++;
+    else { c.forEach(lay); pos[n.id] = (pos[c[0].id] + pos[c[c.length - 1].id]) / 2; }
+  })(root);
+  const ucs = R.algo === "UCS";
+  const XG = ucs ? 74 : 58, YG = 78, PAD = 38, r = 19;
+  const w = Math.max(0, leaf - 1) * XG, h = maxD * YG;
+  const vbW = Math.max(w + 2 * PAD + 40, 560);
+  const ox = (vbW - w) / 2, oy = PAD;
+  let y0 = 0, vbH = Math.max(h + 2 * PAD, 250), cropped = false;
+  const cw = tsvg.clientWidth || 800, ch = tsvg.clientHeight || 300;
+  const maxVbH = ch / Math.min(0.5, cw / vbW);
+  let MAXL = maxD;
+  if (vbH > maxVbH && maxD > 2) {
+    MAXL = Math.max(2, Math.floor((maxVbH - 2 * PAD) / YG));
+    if (MAXL < maxD) { cropped = true; y0 = oy + (maxD - MAXL) * YG - PAD; vbH = MAXL * YG + 2 * PAD; }
+  }
+  tsvg.setAttribute("viewBox", `0 ${y0} ${vbW} ${vbH}`);
+  const X = (n) => ox + pos[n.id] * XG, Y = (n) => oy + n.d * YG;
+  const pathSet = new Set(ev.path || []);
+  const eL = svgEl("g", null, tsvg), nL = svgEl("g", null, tsvg);
+  for (const n of vis) {
+    if (n.parent == null) continue;
+    const p = R.tree[n.parent];
+    const [ux, uy] = unit(X(n) - X(p), Y(n) - Y(p));
+    const onPath = pathSet.has(n.id) && pathSet.has(p.id), isNew = ev.newNode === n.id;
+    svgEl("line", { x1: X(p) + ux * r, y1: Y(p) + uy * r, x2: X(n) - ux * r, y2: Y(n) - uy * r,
+      stroke: onPath ? ECOL.path : isNew ? ECOL.hot : "#b3bac8", "stroke-width": onPath || isNew ? 3.5 : 1.8 }, eL);
+    if (ucs) {
+      const mx = (X(p) + X(n)) / 2, my = (Y(p) + Y(n)) / 2;
+      svgEl("text", { x: mx + (X(n) > X(p) ? 6 : X(n) < X(p) ? -6 : -6), y: my + 4, "text-anchor": X(n) > X(p) ? "start" : "end", "font-size": 12, "font-weight": 700, fill: "#b07a2a" }, eL).textContent = fmt(R.F.succ[p.state].find(x => x.edge === n.edge)?.cost ?? (n.g - p.g));
+    }
+  }
+  for (const n of vis) {
+    const ns = nodeStatus(n, k);
+    let kind = pathSet.has(n.id) ? "found" : ns === "frontier" ? "front" : ns === "expanded" ? "closed" : ns === "goal" ? "found" : ns;
+    const sty = NSTY[kind], x = X(n), y = Y(n);
+    const grp = svgEl("g", null, nL);
+    if (ev.cur === n.id && !ev.final) svgEl("circle", { cx: x, cy: y, r: r + 5.5, fill: "none", stroke: "#f08c00", "stroke-width": 3.5 }, grp);
+    if (ev.newNode === n.id && !pathSet.has(n.id)) svgEl("circle", { cx: x, cy: y, r: r + 5, fill: "none", stroke: ECOL.prev, "stroke-width": 3 }, grp);
+    svgEl("circle", { cx: x, cy: y, r, fill: sty.f, stroke: sty.s, "stroke-width": sty.w, "stroke-dasharray": sty.dash || null }, grp);
+    const name = R.F.name(n.state), fs = name.length <= 2 ? 15 : name.length === 3 ? 12 : 10;
+    svgEl("text", { x, y: y + fs * 0.36, "text-anchor": "middle", "font-size": fs, "font-weight": 750, fill: kind === "skipped" ? "#8a909c" : "#1d2330" }, grp).textContent = name;
+    if (n.order != null && n.expanded != null && n.expanded <= k) {
+      const bw = Math.max(18, 7 + String(n.order).length * 6.5);
+      svgEl("rect", { x: x - r * 0.95 - bw / 2, y: y - r * 0.95 - 9, width: bw, height: 18, rx: 9, fill: ECOL.prev }, grp);
+      svgEl("text", { x: x - r * 0.95, y: y - r * 0.95 + 3.8, "text-anchor": "middle", "font-size": 10.5, "font-weight": 750, fill: "#fff" }, grp).textContent = n.order;
+    }
+    if (ucs) svgEl("text", { x: x + r + 4, y: y + 4.5, "font-size": 12, "font-weight": 700, fill: "#69728a" }, grp).textContent = "g=" + fmt(n.g);
+    if (kind === "skipped" || kind === "cut")
+      svgEl("text", { x, y: y + r + 14, "text-anchor": "middle", "font-size": 11.5, "font-weight": 750, fill: kind === "skipped" ? "#d64545" : "#7f8796" }, grp).textContent = kind === "skipped" ? "skip" : "cut";
+  }
+  info.textContent = (R.algo === "IDS" ? `iteration with limit = ${ev.limit} · ` : "") + `${vis.length} node${vis.length === 1 ? "" : "s"}` +
+    (cropped ? ` · showing the deepest ${MAXL} levels` : "") + " · numbers = expansion order";
+}
+
+/* ================= Side panels ================= */
+const FR_META = {
+  BFS: "FIFO queue: pop on the left, push on the right",
+  DFS: "LIFO stack: push and pop on the right (top)",
+  IDS: "LIFO stack of ⟨node, depth⟩: top is on the right",
+  UCS: "OPEN, sorted by g: pop the smallest (left)",
+};
+function renderSide(V) {
+  V = V || viewState();
+  const { R, ev } = V;
+  const algo = S.algo;
+  $("#frTitle").textContent = algo === "UCS" ? "Frontier (OPEN)" : algo === "BFS" ? "Frontier (queue)" : "Frontier (stack)";
+  $("#frMeta").textContent = FR_META[algo];
+  const fb = $("#frontier"); fb.textContent = "";
+  if (!ev || !ev.frontier.length) fb.append(hEl("span", "empty", ev ? "empty" : "—"));
+  else {
+    const lifo = algo === "DFS" || algo === "IDS";
+    const nextI = lifo ? ev.frontier.length - 1 : 0;
+    ev.frontier.forEach((id, i) => {
+      const n = R.tree[id], c = hEl("div", "chip");
+      c.append(hEl("span", null, R.F.name(n.state)));
+      c.append(hEl("small", null, algo === "UCS" ? `g=${fmt(n.g)}` : algo === "IDS" ? `d=${n.d}` :
+        (n.parent == null ? "root" : `from ${R.F.name(R.tree[n.parent].state)}`)));
+      if (i === nextI && !ev.final) c.classList.add("next");
+      if (id === ev.newNode) c.classList.add("new");
+      c.title = "path: " + pathTxt(R, pathIds(R, n));
+      fb.append(c);
+    });
+  }
+  $("#stats").textContent = ev ? `generated ${ev.stats.gen} · expanded ${ev.stats.exp} · max frontier size ${ev.stats.maxF}` : "generated 0 · expanded 0";
+  $("#closedPanel").hidden = !S.closed;
+  const cb = $("#closed"); cb.textContent = "";
+  $("#clMeta").textContent = algo === "IDS" ? "per iteration: state : depth" : "states already expanded";
+  if (!ev || !ev.closed || !ev.closed.length) cb.append(hEl("span", "empty", "∅"));
+  else for (const [s, d] of ev.closed) cb.append(hEl("div", "chip closed", R.F.name(s) + (d != null ? ` : ${d}` : "")));
+  const log = $("#log"); log.textContent = "";
+  if (R && S.k >= 0) {
+    const from = Math.max(0, S.k - 79);
+    for (let i = from; i <= S.k; i++) {
+      const li = hEl("li", i === S.k ? "cur" : null);
+      li.append(hEl("b", null, String(i + 1)), hEl("span", null, R.events[i].msg));
+      li.addEventListener("click", () => { stopPlay(); S.k = i; renderRun(); });
+      log.append(li);
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function renderStatus(V) {
+  const el = $("#status"); el.className = "status";
+  const R = S.run;
+  if (!R) {
+    el.textContent = S.g.nodes.length ? "Choose a start state with the “Start” tool to run a search." :
+      "Empty canvas — use “＋ Node” and “→ Edge” to build a graph, or pick an example.";
+  } else if (S.k < 0) {
+    const goals = S.g.goals.map(id => nodeById(id)?.name).filter(Boolean);
+    el.textContent = `Ready: ${S.algo}${S.closed ? " with a CLOSED list" : ""}. Start = ${R.F.name(R.F.start)}, goal${goals.length === 1 ? "" : "s"} = ${goals.join(", ") || "none"}. Press “Step ▶” (or →) to begin.`;
+  } else {
+    const ev = R.events[S.k]; el.textContent = ev.msg;
+    if (ev.final) el.classList.add(ev.result === "found" ? "ok" : ev.result === "unsolvable" ? "bad" : "warn");
+  }
+  const atEnd = !R || (R.done && S.k >= R.events.length - 1);
+  $("#stepNo").textContent = R && S.k >= 0 ? `step ${S.k + 1}${R.done ? ` / ${R.events.length}` : ""}` : "";
+  $("#bBack").disabled = !R || S.k < 0;
+  $("#bReset").disabled = !R || S.k < 0;
+  for (const id of ["#bStep", "#bNext", "#bPlay", "#bEnd"]) $(id).disabled = atEnd;
+  $("#bPlay").textContent = S.timer ? "❚❚ Pause" : "▶ Play";
+}
+function renderRun() {
+  const V = viewState();
+  renderGraph(V); renderTree(V); highlightCode(V.ev); renderSide(V); renderStatus(V);
+}
+function renderAll() {
+  $$("#algoSeg button").forEach(b => b.classList.toggle("on", b.dataset.algo === S.algo));
+  $$("#viewSeg button").forEach(b => b.classList.toggle("on", b.dataset.view === S.view));
+  $$("#tools .tool[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === S.mode));
+  $("#left").classList.toggle("only-graph", S.view === "graph");
+  $("#left").classList.toggle("only-tree", S.view === "tree");
+  $("#closedT").checked = S.closed; $("#orderSel").value = S.order; $("#costsT").checked = S.showCosts;
+  $("#presetSel").value = S.presetKey;
+  document.documentElement.style.setProperty("--fs", S.fs + "px");
+  renderCode(); renderRun(); updateHint();
+}
+
+/* ================= Run control ================= */
+function resetRun() {
+  stopPlay(); S.k = -1;
+  S.run = S.g.start != null && nodeById(S.g.start) ? newRun(S.algo, S.closed, freeze()) : null;
+}
+function stepF() {
+  if (!S.run) return false;
+  const nk = ensure(S.run, S.k + 1);
+  if (nk === S.k) { stopPlay(); renderStatus(); return false; }
+  S.k = nk; renderRun(); return true;
+}
+function back() { if (S.run && S.k >= 0) { stopPlay(); S.k--; renderRun(); } }
+function nextPop() {
+  if (!S.run) return; stopPlay();
+  let i = S.k;
+  for (;;) {
+    const ni = ensure(S.run, i + 1); if (ni === i) break; i = ni;
+    const t = S.run.events[i];
+    if (t.type === "pop" || t.type === "iter" || t.final) break;
+  }
+  S.k = i; renderRun();
+}
+function runEnd() { if (!S.run) return; stopPlay(); while (pull(S.run)); S.k = S.run.events.length - 1; renderRun(); }
+const DELAYS = [1600, 1250, 1000, 800, 640, 500, 390, 300, 220, 150];
+function startPlay() {
+  if (!S.run || S.timer) return;
+  S.timer = setInterval(() => { if (!stepF()) stopPlay(); }, DELAYS[$("#speed").value - 1]);
+  renderStatus();
+}
+function stopPlay() { if (S.timer) { clearInterval(S.timer); S.timer = null; } if (S.run) renderStatus(); }
+function togglePlay() { S.timer ? stopPlay() : startPlay(); }
+
+/* ================= Editing ================= */
+function pushUndo() {
+  S.undo.push(JSON.stringify({ g: S.g, nextId: S.nextId, presetKey: S.presetKey }));
+  if (S.undo.length > 80) S.undo.shift();
+}
+function undo() {
+  const s = S.undo.pop(); if (!s) { flash("Nothing to undo."); return; }
+  const d = JSON.parse(s); S.g = d.g; S.nextId = d.nextId; S.presetKey = d.presetKey; S.edgeSrc = null;
+  fitGraphView(); save(); resetRun(); renderAll();
+}
+function change(fn) {
+  pushUndo(); fn(); S.presetKey = "custom"; save(); resetRun(); renderAll();
+}
+function nextName() {
+  const used = new Set(S.g.nodes.map(n => n.name));
+  for (const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") if (!used.has(c)) return c;
+  for (let i = 1; ; i++) if (!used.has("N" + i)) return "N" + i;
+}
+const clampX = (x) => Math.max(S.vb[0] + RAD + 8, Math.min(S.vb[0] + S.vb[2] - RAD - 8, x));
+const clampY = (y) => Math.max(S.vb[1] + RAD + 8, Math.min(S.vb[1] + S.vb[3] - RAD - 30, y));
+function addNodeAt(p) {
+  if (S.g.nodes.length >= 40) { flash("At most 40 nodes."); return; }
+  if (S.g.nodes.some(n => Math.hypot(n.x - p.x, n.y - p.y) < 2 * RAD + 8)) { flash("Too close to another node."); return; }
+  change(() => S.g.nodes.push({ id: S.nextId++, name: nextName(), x: Math.round(clampX(p.x)), y: Math.round(clampY(p.y)) }));
+}
+function addEdge(a, b) {
+  S.edgeSrc = null; hidePreview();
+  if (a === b) { flash("Self-loops are not supported."); renderGraph(); return; }
+  if (S.g.edges.some(e => e.from === a && e.to === b)) { flash("This edge already exists — double-click it to change its cost."); renderGraph(); updateHint(); return; }
+  let id;
+  change(() => { id = S.nextId++; S.g.edges.push({ id, from: a, to: b, cost: 1 }); });
+  if (S.showCosts) editCost(id);
+}
+function deleteNode(id) {
+  S.g.nodes = S.g.nodes.filter(n => n.id !== id);
+  S.g.edges = S.g.edges.filter(e => e.from !== id && e.to !== id);
+  S.g.goals = S.g.goals.filter(g => g !== id);
+  if (S.g.start === id) S.g.start = null;
+}
+function editCost(id) {
+  const e = S.g.edges.find(x => x.id === id); if (!e) return;
+  const p = labelPos(e);
+  openEditor(p.lx, p.ly, fmt(e.cost), (v) => {
+    const c = Number(v);
+    if (v.trim() === "" || !isFinite(c) || c < 0) { flash("The cost must be a number ≥ 0."); return; }
+    if (c !== e.cost) change(() => { e.cost = c; });
+  });
+}
+function renameNode(n) {
+  openEditor(n.x, n.y, n.name, (v) => {
+    v = v.trim();
+    if (!v || v === n.name) return;
+    if (!/^[^\s#]{1,8}$/.test(v)) { flash("Names: up to 8 characters, no spaces or #."); return; }
+    if (S.g.nodes.some(m => m !== n && m.name === v)) { flash(`The name “${v}” is already used.`); return; }
+    change(() => { n.name = v; });
+  });
+}
+function openEditor(x, y, value, onCommit) {
+  const ed = $("#inlineEd"), wrap = $("#gwrap");
+  const m = gsvg.getScreenCTM(), wr = wrap.getBoundingClientRect();
+  ed.hidden = false; ed.value = value;
+  ed.style.left = (m.a * x + m.e - wr.left - ed.offsetWidth / 2) + "px";
+  ed.style.top = (m.d * y + m.f - wr.top - ed.offsetHeight / 2) + "px";
+  S.edit = { onCommit };
+  setTimeout(() => { ed.focus(); ed.select(); }, 0);
+}
+function closeEditor(commit) {
+  const ed = $("#inlineEd");
+  if (!S.edit) { ed.hidden = true; return; }
+  const cb = S.edit.onCommit, v = ed.value; S.edit = null; ed.hidden = true;
+  if (commit) cb(v);
+}
+$("#inlineEd").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); closeEditor(true); }
+  else if (e.key === "Escape") { e.preventDefault(); closeEditor(false); }
+});
+$("#inlineEd").addEventListener("blur", () => closeEditor(true));
+
+let flashTimer = null;
+function flash(msg) {
+  const h = $("#hint"); h.textContent = msg; h.classList.add("err");
+  clearTimeout(flashTimer); flashTimer = setTimeout(() => { h.classList.remove("err"); updateHint(); }, 2600);
+}
+const HINTS = {
+  move: "Drag nodes to move them. Double-click a node to rename it, or an edge to change its cost.",
+  node: "Click on empty space to add a node.",
+  edge: "Click the source node, then the target node.",
+  start: "Click a node to make it the start state.",
+  goal: "Click nodes to mark / unmark them as goal states.",
+  delete: "Click a node or an edge to delete it.",
+};
+function updateHint() {
+  const h = $("#hint"); if (h.classList.contains("err")) return;
+  h.textContent = S.mode === "edge" && S.edgeSrc != null
+    ? `Edge from ${nodeById(S.edgeSrc)?.name}: now click the target node (Esc to cancel).` : HINTS[S.mode];
+}
+function setMode(m) { S.mode = m; S.edgeSrc = null; hidePreview(); closeEditor(true); renderAll(); }
+function hidePreview() { prevLine.setAttribute("visibility", "hidden"); }
+
+function svgPt(ev) {
+  const pt = gsvg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  return pt.matrixTransform(gsvg.getScreenCTM().inverse());
+}
+gsvg.addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0) return;
+  if (S.edit) { closeEditor(true); }
+  const p = svgPt(ev), now = performance.now();
+  const nodeEl = ev.target.closest("[data-node]"), edgeEl = !nodeEl && ev.target.closest("[data-edge]");
+  if (nodeEl) {
+    const id = +nodeEl.dataset.node, n = nodeById(id); if (!n) return;
+    const dbl = S.last.kind === "n" && S.last.id === id && now - S.last.t < 400;
+    S.last = { kind: "n", id, t: now };
+    switch (S.mode) {
+      case "move": case "node":
+        if (dbl) { S.drag = null; renameNode(n); return; }
+        S.drag = { id, ox: p.x - n.x, oy: p.y - n.y, moved: false };
+        gsvg.setPointerCapture(ev.pointerId);
+        break;
+      case "edge":
+        if (S.edgeSrc == null) { S.edgeSrc = id; renderGraph(); updateHint(); }
+        else if (S.edgeSrc === id) { S.edgeSrc = null; hidePreview(); renderGraph(); updateHint(); }
+        else addEdge(S.edgeSrc, id);
+        break;
+      case "start": if (S.g.start !== id) change(() => { S.g.start = id; }); break;
+      case "goal": change(() => { const i = S.g.goals.indexOf(id); if (i >= 0) S.g.goals.splice(i, 1); else S.g.goals.push(id); }); break;
+      case "delete": change(() => deleteNode(id)); break;
+    }
+  } else if (edgeEl) {
+    const id = +edgeEl.dataset.edge;
+    const dbl = S.last.kind === "e" && S.last.id === id && now - S.last.t < 400;
+    S.last = { kind: "e", id, t: now };
+    if (S.mode === "delete") change(() => { S.g.edges = S.g.edges.filter(e => e.id !== id); });
+    else if (dbl) editCost(id);
+  } else {
+    S.last = { kind: null, id: null, t: now };
+    if (S.mode === "node") addNodeAt(p);
+    else if (S.mode === "edge" && S.edgeSrc != null) { S.edgeSrc = null; hidePreview(); renderGraph(); updateHint(); }
+  }
+});
+gsvg.addEventListener("pointermove", (ev) => {
+  if (S.drag) {
+    const p = svgPt(ev), n = nodeById(S.drag.id); if (!n) return;
+    const nx = Math.round(clampX(p.x - S.drag.ox)), ny = Math.round(clampY(p.y - S.drag.oy));
+    if (!S.drag.moved && Math.hypot(nx - n.x, ny - n.y) < 2) return;
+    if (!S.drag.moved) { pushUndo(); S.drag.moved = true; }
+    n.x = nx; n.y = ny; renderGraph();
+  } else if (S.mode === "edge" && S.edgeSrc != null) {
+    const p = svgPt(ev), a = nodeById(S.edgeSrc); if (!a) return;
+    const [ux, uy] = unit(p.x - a.x, p.y - a.y), dist = Math.hypot(p.x - a.x, p.y - a.y);
+    if (dist < RAD + 14) { hidePreview(); return; }
+    prevLine.setAttribute("x1", a.x + ux * RAD); prevLine.setAttribute("y1", a.y + uy * RAD);
+    prevLine.setAttribute("x2", p.x - ux * 12); prevLine.setAttribute("y2", p.y - uy * 12);
+    prevLine.setAttribute("visibility", "visible");
+  }
+});
+function endDrag() {
+  if (!S.drag) return;
+  const moved = S.drag.moved; S.drag = null;
+  if (!moved) return;
+  save();
+  if (S.run && S.order === "lr" && freeze().sig !== S.run.F.sig) { resetRun(); renderRun(); flash("Successor order changed → the run was reset."); }
+  else renderGraph();
+}
+gsvg.addEventListener("pointerup", endDrag);
+gsvg.addEventListener("pointercancel", endDrag);
+
+/* ---------- text editing ---------- */
+function graphToText() {
+  const g = S.g, nm = (id) => nodeById(id)?.name;
+  const L = ["# One directed edge per line:  FROM TO COST", "# Also:  start X   |   goal Y Z   |   node W", ""];
+  if (g.start != null && nm(g.start)) L.push(`start ${nm(g.start)}`);
+  const gl = g.goals.map(nm).filter(Boolean); if (gl.length) L.push(`goal ${gl.join(" ")}`);
+  L.push("");
+  g.edges.forEach(e => { if (nm(e.from) && nm(e.to)) L.push(`${nm(e.from)} ${nm(e.to)} ${fmt(e.cost)}`); });
+  const used = new Set(); g.edges.forEach(e => { used.add(e.from); used.add(e.to); });
+  if (g.start != null) used.add(g.start); g.goals.forEach(x => used.add(x));
+  const iso = g.nodes.filter(n => !used.has(n.id)); if (iso.length) L.push(`node ${iso.map(n => n.name).join(" ")}`);
+  return L.join("\n");
+}
+function parseText(txt) {
+  const names = [], seen = new Set(), add = (n) => { if (!seen.has(n)) { seen.add(n); names.push(n); } };
+  const edges = new Map(); let start = null; const goals = [];
+  const ok = (n) => /^[^\s#]{1,8}$/.test(n);
+  const lines = txt.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/#.*/, "").trim(); if (!line) continue;
+    const t = line.split(/\s+/), kw = t[0].toLowerCase(), bad = (m) => ({ error: `Line ${i + 1}: ${m}` });
+    if (kw === "start") {
+      if (t.length !== 2) return bad("use “start NAME”.");
+      if (!ok(t[1])) return bad("invalid name."); start = t[1]; add(t[1]);
+    } else if (kw === "goal" || kw === "goals") {
+      if (t.length < 2) return bad("use “goal NAME …”.");
+      for (const n of t.slice(1)) { if (!ok(n)) return bad("invalid name."); add(n); if (!goals.includes(n)) goals.push(n); }
+    } else if (kw === "node" || kw === "nodes") {
+      for (const n of t.slice(1)) { if (!ok(n)) return bad("invalid name."); add(n); }
+    } else {
+      if (t.length < 2 || t.length > 3) return bad("expected “FROM TO COST”.");
+      const [a, b] = t;
+      if (!ok(a) || !ok(b)) return bad("invalid name (up to 8 characters, no spaces).");
+      if (a === b) return bad("self-loops are not supported.");
+      let c = 1;
+      if (t.length === 3) { c = Number(t[2]); if (!isFinite(c) || c < 0) return bad("the cost must be a number ≥ 0."); }
+      add(a); add(b); edges.set(a + "\u0000" + b, [a, b, c]);
+    }
+  }
+  if (names.length > 40) return { error: "At most 40 nodes." };
+  return { names, edges: [...edges.values()], start, goals };
+}
+function autoLayout() {
+  const g = S.g; if (!g.nodes.length) return;
+  const out = {}; g.nodes.forEach(n => out[n.id] = []);
+  g.edges.forEach(e => { if (out[e.from]) out[e.from].push(e.to); });
+  const layer = {};
+  const bfs = (r, base) => {
+    const q = [r]; layer[r] = base;
+    while (q.length) { const v = q.shift(); for (const w of out[v]) if (layer[w] == null) { layer[w] = layer[v] + 1; q.push(w); } }
+  };
+  if (g.start != null && out[g.start]) bfs(g.start, 0);
+  let maxL = Math.max(-1, ...Object.values(layer));
+  for (const n of g.nodes) if (layer[n.id] == null) { bfs(n.id, maxL + 1); maxL = Math.max(maxL, ...Object.values(layer)); }
+  const L = maxL + 1, rows = Array.from({ length: L }, () => []);
+  g.nodes.forEach(n => rows[layer[n.id]].push(n));
+  const top = 70, bottom = H - 60, gap = L > 1 ? Math.min(140, (bottom - top) / (L - 1)) : 0;
+  rows.forEach((row, i) => {
+    row.sort((a, b) => a.x - b.x || a.name.localeCompare(b.name));
+    row.forEach((n, j) => { n.x = Math.round(W * (j + 1) / (row.length + 1)); n.y = Math.round(L > 1 ? top + i * gap : H / 2); });
+  });
+}
+function applyText() {
+  const res = parseText($("#textArea").value);
+  if (res.error) { $("#textErr").textContent = res.error; return; }
+  change(() => {
+    const old = new Map(S.g.nodes.map(n => [n.name, n]));
+    const nodes = [], idOf = {}; let fresh = false;
+    for (const name of res.names) {
+      const o = old.get(name);
+      if (o) { nodes.push(o); idOf[name] = o.id; }
+      else { const n = { id: S.nextId++, name, x: W / 2, y: H / 2 }; nodes.push(n); idOf[name] = n.id; fresh = true; }
+    }
+    S.g.nodes = nodes;
+    S.g.edges = res.edges.map(([a, b, c]) => ({ id: S.nextId++, from: idOf[a], to: idOf[b], cost: c }));
+    S.g.start = res.start ? idOf[res.start] : null;
+    S.g.goals = res.goals.map(x => idOf[x]);
+    if (fresh) autoLayout();
+    fitGraphView();
+  });
+  $("#textModal").hidden = true;
+}
+
+/* ---------- compare ---------- */
+function compareAll() {
+  if (S.g.start == null || !nodeById(S.g.start)) { flash("Set a start state first."); return; }
+  const F = freeze(), rows = [];
+  for (const a of ["BFS", "DFS", "IDS", "UCS"]) {
+    const R = newRun(a, S.closed, F); let guard = 0;
+    while (pull(R) && guard++ < 50000);
+    const last = R.events[R.events.length - 1];
+    const row = { a, res: last.result, path: "—", depth: null, cost: null, gen: last.stats.gen, exp: last.stats.exp, maxF: last.stats.maxF };
+    if (last.result === "found") { const n = R.tree[last.path[last.path.length - 1]]; row.path = pathTxt(R, last.path); row.depth = n.d; row.cost = n.g; }
+    rows.push(row);
+  }
+  const found = rows.filter(r => r.res === "found");
+  const minC = found.length ? Math.min(...found.map(r => r.cost)) : null, minD = found.length ? Math.min(...found.map(r => r.depth)) : null;
+  const tbl = hEl("table"), thead = hEl("tr");
+  ["Algorithm", "Result", "Solution path", "Depth", "Cost", "Generated", "Expanded", "Max frontier"].forEach(h => thead.append(hEl("th", null, h)));
+  tbl.append(thead);
+  for (const r of rows) {
+    const tr = hEl("tr");
+    tr.append(hEl("td", null, r.a));
+    tr.append(hEl("td", null, r.res === "found" ? "found" : r.res === "unsolvable" ? "unsolvable" : "stopped (∞)"));
+    tr.append(hEl("td", null, r.path));
+    tr.append(hEl("td", r.depth != null && r.depth === minD ? "best" : null, r.depth ?? "—"));
+    tr.append(hEl("td", r.cost != null && r.cost === minC ? "best" : null, r.cost != null ? fmt(r.cost) : "—"));
+    tr.append(hEl("td", null, r.gen)); tr.append(hEl("td", null, r.exp)); tr.append(hEl("td", null, r.maxF));
+    tbl.append(tr);
+  }
+  $("#cmpTitle").textContent = `Compare all algorithms — CLOSED ${S.closed ? "on" : "off"}, successors ${F.orderLabel}`;
+  const body = $("#cmpBody"); body.textContent = ""; body.append(tbl);
+  body.append(hEl("p", null, "Green = the shallowest depth / the cheapest cost among the solutions found. “stopped (∞)” means the search would never end."));
+  $("#cmpModal").hidden = false;
+}
+
+/* ================= Wiring ================= */
+const presetSel = $("#presetSel");
+for (const p of PRESETS) { const o = hEl("option", null, p.title); o.value = p.key; presetSel.append(o); }
+{ const o = hEl("option", null, "Custom graph"); o.value = "custom"; o.hidden = true; presetSel.append(o); }
+
+$("#algoSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.algo = b.dataset.algo; save(); resetRun(); renderAll();
+});
+$("#viewSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.view = b.dataset.view; save(); renderAll();
+});
+$("#closedT").addEventListener("change", (e) => { S.closed = e.target.checked; save(); resetRun(); renderAll(); });
+$("#orderSel").addEventListener("change", (e) => { S.order = e.target.value; e.target.blur(); save(); resetRun(); renderAll(); });
+presetSel.addEventListener("change", (e) => {
+  const v = e.target.value; e.target.blur(); if (v === "custom") return;
+  pushUndo(); loadPreset(v); fitGraphView(); save(); resetRun(); renderAll();
+});
+$("#costsT").addEventListener("change", (e) => { S.showCosts = e.target.checked; save(); renderGraph(); });
+$("#tools").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
+$("#bText").addEventListener("click", () => { $("#textArea").value = graphToText(); $("#textErr").textContent = ""; $("#textModal").hidden = false; $("#textArea").focus(); });
+$("#textCancel").addEventListener("click", () => { $("#textModal").hidden = true; });
+$("#textApply").addEventListener("click", applyText);
+$("#bLayout").addEventListener("click", () => {
+  pushUndo(); autoLayout(); fitGraphView(); save();
+  if (S.run && S.order === "lr" && freeze().sig !== S.run.F.sig) resetRun();
+  renderAll();
+});
+$("#bUndo").addEventListener("click", undo);
+$("#bFit").addEventListener("click", () => { fitGraphView(); renderGraph(); });
+$("#bReset").addEventListener("click", () => { resetRun(); renderRun(); });
+$("#bBack").addEventListener("click", back);
+$("#bStep").addEventListener("click", () => { stopPlay(); stepF(); });
+$("#bNext").addEventListener("click", nextPop);
+$("#bPlay").addEventListener("click", togglePlay);
+$("#bEnd").addEventListener("click", runEnd);
+$("#speed").addEventListener("input", () => { if (S.timer) { stopPlay(); startPlay(); } });
+$("#bCompare").addEventListener("click", compareAll);
+$("#cmpClose").addEventListener("click", () => { $("#cmpModal").hidden = true; });
+$("#bHelp").addEventListener("click", () => { $("#helpModal").hidden = false; });
+$("#helpClose").addEventListener("click", () => { $("#helpModal").hidden = true; });
+$("#fMinus").addEventListener("click", () => { S.fs = Math.max(11, S.fs - 1); save(); renderAll(); });
+$("#fPlus").addEventListener("click", () => { S.fs = Math.min(22, S.fs + 1); save(); renderAll(); });
+$$(".modal").forEach(m => m.addEventListener("pointerdown", (e) => { if (e.target === m) m.hidden = true; }));
+document.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) b.blur(); });
+window.addEventListener("resize", () => { closeEditor(true); renderTree(); });
+
+document.addEventListener("keydown", (e) => {
+  const tag = e.target.tagName;
+  const openModal = $$(".modal").find(m => !m.hidden);
+  if (openModal) { if (e.key === "Escape") openModal.hidden = true; return; }
+  if (tag === "INPUT" && e.target.type !== "checkbox" && e.target.type !== "range") return;
+  if (tag === "TEXTAREA" || tag === "SELECT") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  let handled = true;
+  switch (e.key) {
+    case "ArrowRight": if (e.shiftKey) nextPop(); else { stopPlay(); stepF(); } break;
+    case "ArrowLeft": back(); break;
+    case " ": togglePlay(); break;
+    case "End": runEnd(); break;
+    case "Home": case "r": case "R": resetRun(); renderRun(); break;
+    case "Escape": if (S.edgeSrc != null) { S.edgeSrc = null; hidePreview(); renderGraph(); updateHint(); } break;
+    case "v": case "V": setMode("move"); break;
+    case "n": case "N": setMode("node"); break;
+    case "e": case "E": setMode("edge"); break;
+    case "s": case "S": setMode("start"); break;
+    case "g": case "G": setMode("goal"); break;
+    case "d": case "D": setMode("delete"); break;
+    default: handled = false;
+  }
+  if (handled) e.preventDefault();
+});
+
+/* ================= Boot ================= */
+if (!restore()) loadPreset("lecture");
+fitGraphView(); resetRun(); renderAll();
+})();
+</script>
+</body>
+</html>
