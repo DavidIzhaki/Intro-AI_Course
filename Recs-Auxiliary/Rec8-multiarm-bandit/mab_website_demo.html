@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website Design Bandit (UCB1)</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --text:#14213d; --muted:#4f5f76; --line:#dfe5ee;
+    --accent:#2563eb; --ok:#15803d; --warn:#b45309;
+    --A:#2563eb; --A-soft:#dbe7ff;
+    --B:#dc2626; --B-soft:#fde0e0;
+    --C:#16a34a; --C-soft:#d9f5e3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:16px 20px 40px}
+  header{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;margin-bottom:14px}
+  h1{font-size:25px;margin:0}
+  h1 small{display:block;font-size:15px;color:var(--muted);font-weight:500}
+  h2{font-size:19px;margin:0 0 10px}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .toggle{display:inline-flex;border:2px solid var(--accent);border-radius:999px;overflow:hidden}
+  .toggle button{border:0;background:#fff;color:var(--accent);padding:9px 18px;font-weight:700;font-size:16px;cursor:pointer}
+  .toggle button.on{background:var(--accent);color:#fff}
+  .btn{border:1px solid #c9d2df;background:#fff;color:var(--text);padding:9px 14px;border-radius:10px;
+       font-weight:600;font-size:16px;cursor:pointer}
+  .btn:hover{border-color:#94a3b8}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.danger{color:#b91c1c}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .grid{display:grid;grid-template-columns:1.05fr 1fr;gap:16px}
+  @media (max-width:980px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(20,33,61,.05)}
+  .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .stack > *{min-width:0}
+  .tablewrap{overflow-x:auto}
+  /* mu-hat: a hat drawn over mu (the combining character renders badly in many fonts) */
+  .hat{position:relative;display:inline-block}
+  .hat::after{content:"^";position:absolute;left:0;right:0;text-align:center;top:-.08em;font-size:.72em;line-height:1;font-weight:400}
+
+  /* ---------- website mock ---------- */
+  .visitor{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-weight:600}
+  .visitor #visitorLabel{color:var(--text);font-size:18px}
+  .site{border:2px solid var(--line);border-radius:14px;overflow:hidden}
+  .site-top{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}
+  .site-top nav{font-weight:500;color:var(--muted);font-size:15px;display:flex;gap:14px}
+  .hero{padding:20px 20px 18px}
+  .tag{display:inline-block;font-size:14px;font-weight:800;letter-spacing:.08em;padding:4px 10px;border-radius:999px;color:#fff}
+  .dlabel{float:right;font-size:15px;font-weight:800;color:var(--text);background:#fff;border:2px solid currentColor;border-radius:8px;padding:2px 9px}
+  .hero h3{font-size:30px;line-height:1.1;margin:12px 0 6px}
+  .hero p{margin:0 0 16px;color:var(--muted)}
+  .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .opt{border:2px solid transparent;border-radius:12px;padding:10px 8px;font-size:17px;font-weight:700;cursor:pointer;color:#fff}
+  .opt small{display:block;font-weight:600;opacity:.95;font-size:14px}
+  .opt.secondary{background:#fff}
+  .opt.leave{grid-column:1 / -1;background:#fff;color:var(--muted);border:2px dashed #aab5c6}
+  .opt:disabled{cursor:not-allowed;opacity:.5}
+  .dA .tag,.dA .opt.main{background:var(--A)} .dA .opt.secondary,.dA .dlabel{color:var(--A);border-color:var(--A)} .dA .hero{background:linear-gradient(180deg,var(--A-soft),#fff 70%)}
+  .dB .tag,.dB .opt.main{background:var(--B)} .dB .opt.secondary,.dB .dlabel{color:var(--B);border-color:var(--B)} .dB .hero{background:linear-gradient(180deg,var(--B-soft),#fff 70%)}
+  .dC .tag,.dC .opt.main{background:var(--C)} .dC .opt.secondary,.dC .dlabel{color:var(--C);border-color:var(--C)} .dC .hero{background:linear-gradient(180deg,var(--C-soft),#fff 70%)}
+  .why{margin-top:12px;padding:10px 12px;border-radius:10px;background:#eef3fb;border-left:5px solid var(--accent);font-size:16px}
+  .last{margin-top:8px;font-size:15px;color:var(--muted)}
+
+  /* ---------- UCB table ---------- */
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:15px;color:var(--muted);font-weight:700;vertical-align:bottom;line-height:1.3}
+  th .f{display:block;font-weight:500;font-size:14px;white-space:nowrap}
+  #ucbTable td{font-size:17px}
+  #ucbTable td:first-child{white-space:nowrap}
+  td.none{text-align:center;color:var(--muted);font-style:italic}
+  tr.next td{background:#fff3d6;font-weight:700}
+  .badge{display:inline-block;margin-left:6px;font-size:13px;font-weight:800;color:#7a3e00;background:#ffd98a;border-radius:6px;padding:1px 7px;vertical-align:1px}
+  .chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .note{font-size:15px;color:var(--muted);margin-top:8px}
+  .tnote{font-size:16px;color:var(--muted);font-weight:600}
+  .tval{font-weight:800;color:var(--text);font-size:19px}
+
+  /* ---------- pseudocode ---------- */
+  pre.code{margin:0;font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f8fafd;border:1px solid var(--line);border-radius:10px;padding:8px 0;overflow-x:auto}
+  pre.code > span{display:block;padding:0 12px;white-space:pre;border-left:5px solid transparent}
+  pre.code > span.hl{background:#fff1c2;border-left-color:#f59e0b}
+  .kw{color:#7c3aed;font-weight:700} .cm{color:#6b7587;font-style:italic}
+
+  /* ---------- log ---------- */
+  .log{max-height:180px;overflow:auto;font-size:15px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:#fbfcfe}
+  .log div{padding:3px 0;border-bottom:1px dashed #e6ebf2}
+  .log div:first-child{font-weight:700}
+
+  /* ---------- auto-test ---------- */
+  .auto-only{display:none}
+  body.auto .auto-only{display:block}
+  body.auto .play-only{display:none}
+  /* Auto-test: compact website so controls and charts fit on a 1280x720 screen */
+  body.auto .site-top, body.auto .hero p{display:none}
+  body.auto .hero{padding:10px 14px 12px}
+  body.auto .hero h3{font-size:21px;margin:8px 0 0}
+  body.auto .opts{display:none}
+  body.auto .why{margin-top:8px;padding:8px 10px}
+  body.auto .last{display:none}
+  details{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fbfcfe}
+  summary{cursor:pointer;font-weight:700;font-size:17px}
+  .ptable td{font-size:17px}
+  .ptable input{width:80px;font-size:16px;padding:5px 6px;border:1px solid #b9c4d4;border-radius:8px;text-align:right}
+  .ptable input.bad{border:2px solid #dc2626;background:#fff0f0}
+  .ptable td.leave{color:var(--muted)}
+  .ptable td.bad{color:#b91c1c;font-weight:700}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+  .controls label{font-size:16px;color:var(--muted);display:flex;gap:8px;align-items:center}
+  .err{color:#b91c1c;font-weight:700;font-size:16px;margin-top:8px}
+  .err:not(:empty)::before{content:"\26A0  "}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .charts > div{min-width:0}
+  .charts h2{font-size:17px;margin-bottom:4px}
+  @media (max-width:560px){.charts{grid-template-columns:1fr}}
+  canvas{width:100%;height:205px;display:block}
+  .legend{font-size:14px;color:var(--muted);margin-top:4px;line-height:1.35}
+  .stat{font-size:16px;margin-top:8px;min-height:1.45em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Website Design Bandit (UCB1)
+      <small>Each visitor sees one design. UCB1 decides which one, and learns from the visitor's reward.</small>
+    </h1>
+    <div class="toolbar">
+      <div class="toggle" role="group" aria-label="Mode">
+        <button id="modePlay" class="on" aria-pressed="true">Play</button>
+        <button id="modeAuto" aria-pressed="false">Auto-test</button>
+      </div>
+      <button class="btn danger" id="btnReset">Reset</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- ================= left: the website ================= -->
+    <div class="stack">
+      <div class="card">
+        <div class="visitor"><span id="visitorLabel">Visitor 1 sees design A</span><span id="modeHint">You are the visitor: pick one option</span></div>
+        <div class="site dA" id="site">
+          <div class="site-top"><span>ShopSmart</span><nav><span>Home</span><span>Deals</span><span>Support</span></nav></div>
+          <div class="hero">
+            <span class="dlabel" id="dlabel">Design A</span>
+            <span class="tag" id="tag">FREE SHIPPING</span>
+            <h3 id="headline">Get it fast, ship it free.</h3>
+            <p id="sub">Free shipping on every order, no minimum.</p>
+            <div class="opts">
+              <button class="opt main" data-opt="buy">Buy now<small>r = 1</small></button>
+              <button class="opt secondary" data-opt="cart">Add to cart<small>r = 0.5</small></button>
+              <button class="opt secondary" data-opt="learn">Learn more<small>r = 0.2</small></button>
+              <button class="opt leave" data-opt="leave">Leave the site (r = 0)</button>
+            </div>
+          </div>
+        </div>
+        <div class="why" id="why"></div>
+        <div class="last" id="last"></div>
+      </div>
+
+      <!-- auto-test: run controls and charts -->
+      <div class="card auto-only">
+        <div class="controls" style="margin-top:0">
+          <button class="btn" id="btnStep" title="Simulate 1 visitor">Step</button>
+          <button class="btn primary" id="btnRun">Run</button>
+          <label>Speed <input type="range" id="speed" style="width:100px" min="1" max="60" value="8"> <span id="speedVal">8</span> visitors/s</label>
+          <button class="btn" id="btn100" title="Simulate 100 visitors">+100</button>
+          <button class="btn" id="btn1000" title="Simulate 1000 visitors">+1000</button>
+        </div>
+        <div class="stat" id="regStat"></div>
+        <div class="charts" style="margin-top:8px">
+          <div>
+            <h2>UCB<sub>a</sub> = <span class="hat">&mu;</span><sub>a</sub> + bonus</h2>
+            <canvas id="cUcb" aria-label="Bar chart of UCB per design"></canvas>
+            <div class="legend">Dark part: <span class="hat">&mu;</span><sub>a</sub>. Light part: the bonus. Black line: the true mean &mu;<sub>a</sub>.</div>
+          </div>
+          <div>
+            <h2>Regret &rho;(t)</h2>
+            <canvas id="cReg" aria-label="Line chart of regret over simulated visitors"></canvas>
+            <div class="legend">&rho;(t) = t&middot;&mu;* &minus; (sum of &mu;<sub>a</sub> of the designs shown to the first t simulated visitors). Only simulated visitors count: the table describes them, not you.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <!-- ================= right: what UCB sees ================= -->
+    <div class="stack">
+      <div class="card">
+        <h2>What UCB1 sees &nbsp;<span class="tnote">t = <span class="tval" id="tval">0</span> pulls so far</span></h2>
+        <div class="tablewrap"><table id="ucbTable">
+          <thead><tr><th>Design a</th><th>n<sub>a</sub></th><th><span class="hat">&mu;</span><sub>a</sub></th><th>bonus<span class="f">&radic;(2 ln t / n<sub>a</sub>)</span></th><th>UCB<sub>a</sub><span class="f"><span class="hat">&mu;</span><sub>a</sub> + bonus</span></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="note">The marked row (&ldquo;shown now&rdquo;) is the design the current visitor sees. Ties go to the first design (A, then B, then C).</div>
+      </div>
+
+      <!-- auto-test: the hidden truth -->
+      <div class="card auto-only">
+        <details id="truthBox" open>
+          <summary>Hidden truth: simulated visitors (UCB1 does not see this)</summary>
+          <p class="note" style="margin:6px 0">Probability of each option for a visitor who sees the design. Leave = 1 minus the others. &mu;<sub>a</sub> = 1&middot;p(Buy) + 0.5&middot;p(Cart) + 0.2&middot;p(Learn) + 0&middot;p(Leave).</p>
+          <div class="tablewrap">
+          <table class="ptable">
+            <thead><tr><th>Design</th><th>Buy now<span class="f">r = 1</span></th><th>Add to cart<span class="f">r = 0.5</span></th><th>Learn more<span class="f">r = 0.2</span></th><th>Leave<span class="f">r = 0</span></th><th>True mean<span class="f">&mu;<sub>a</sub></span></th></tr></thead>
+            <tbody id="ptBody"></tbody>
+          </table>
+          </div>
+          <div class="controls">
+            <span class="note" style="margin:0">Presets (start over):</span>
+            <button class="btn" data-preset="default">C is best</button>
+            <button class="btn" data-preset="close">Close call (B vs C)</button>
+            <button class="btn" data-preset="obvious">Obvious winner</button>
+          </div>
+          <div class="err" id="ptErr" role="alert"></div>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>UCB1 pseudocode</h2>
+<pre class="code" id="code"><span data-l="1"><span class="kw">for</span> a = 1..K:      <span class="cm">// warm-up: show every design once</span></span><span data-l="2">    r &larr; PullArm(a)</span><span data-l="3">    S[a] &larr; r, n[a] &larr; 1, <span class="hat">&mu;</span>[a] &larr; r</span><span data-l="4">t &larr; K              <span class="cm">// total pulls so far</span></span><span data-l="5"><span class="kw">repeat until</span> stopped:</span><span data-l="6">    <span class="kw">for</span> a = 1..K:</span><span data-l="7">        UCB[a] &larr; <span class="hat">&mu;</span>[a] + &radic;(2 ln t / n[a])</span><span data-l="8">    a* &larr; argmax<sub>a</sub> UCB[a]</span><span data-l="9">    r &larr; PullArm(a*)   <span class="cm">// wait for the visitor</span></span><span data-l="10">    S[a*] &larr; S[a*] + r, n[a*] &larr; n[a*] + 1</span><span data-l="11">    <span class="hat">&mu;</span>[a*] &larr; S[a*] / n[a*]</span><span data-l="12">    t &larr; t + 1</span></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   LOGIC (no drawing here): UCB1 as on the slides
+   ===================================================================== */
+const DESIGNS = ['A','B','C'];
+const OPTIONS = ['buy','cart','learn','leave'];
+const REWARD  = {buy:1, cart:0.5, learn:0.2, leave:0};
+const OPTION_NAME = {buy:'Buy now', cart:'Add to cart', learn:'Learn more', leave:'Leave'};
+
+function makeRng(seed){               // mulberry32: small seeded random generator
+  let s = seed >>> 0;
+  return function(){
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeBandit(K){
+  return {K, n:Array(K).fill(0), S:Array(K).fill(0), t:0};   // t = total pulls so far
+}
+function muHat(b,a){ return b.n[a] ? b.S[a]/b.n[a] : null; }
+function bonus(b,a){ return b.n[a] ? Math.sqrt(2*Math.log(b.t)/b.n[a]) : null; }
+function ucb(b,a){ return b.n[a] ? muHat(b,a) + bonus(b,a) : null; }
+function choose(b){                   // returns {a, warmup}
+  for(let a=0;a<b.K;a++) if(b.n[a]===0) return {a, warmup:true};
+  let best=0;
+  for(let a=1;a<b.K;a++) if(ucb(b,a) > ucb(b,best)) best=a;   // ties: first design
+  return {a:best, warmup:false};
+}
+function update(b,a,r){ b.S[a]+=r; b.n[a]+=1; b.t+=1; }
+
+/* why choose() picks its design: the UCB values it compared and any exact ties */
+function explainChoice(b){
+  const c = choose(b);
+  if(c.warmup) return {a:c.a, warmup:true, t:b.t};
+  const u = Array.from({length:b.K}, (_,a)=>ucb(b,a));
+  const ties = u.map((_,a)=>a).filter(a=>a!==c.a && u[a]===u[c.a]);
+  return {a:c.a, warmup:false, t:b.t, ucbs:u, ties};
+}
+
+function trueMean(p){ return REWARD.buy*p.buy + REWARD.cart*p.cart + REWARD.learn*p.learn; }
+function sampleOption(p,u){           // u in [0,1)
+  if(u < p.buy) return 'buy';
+  if(u < p.buy+p.cart) return 'cart';
+  if(u < p.buy+p.cart+p.learn) return 'learn';
+  return 'leave';
+}
+function rowValid(p){
+  return [p.buy,p.cart,p.learn].every(x=>typeof x==='number' && Number.isFinite(x) && x>=0 && x<=1)
+         && p.buy+p.cart+p.learn <= 1+1e-9;
+}
+/* regret after each simulated visitor: rho(t) = t*mu_star - sum of mu_a of the designs shown */
+function regretHistory(arms, mus){
+  const best = Math.max(...mus), h = [0];
+  let r = 0;
+  for(const a of arms){ r += best - mus[a]; h.push(r); }
+  return h;
+}
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const PRESETS = {
+  default:{A:{buy:.04,cart:.10,learn:.15}, B:{buy:.08,cart:.10,learn:.10}, C:{buy:.22,cart:.20,learn:.10}},
+  close:  {A:{buy:.04,cart:.08,learn:.10}, B:{buy:.12,cart:.10,learn:.05}, C:{buy:.10,cart:.16,learn:.05}},
+  obvious:{A:{buy:.02,cart:.05,learn:.10}, B:{buy:.05,cart:.05,learn:.10}, C:{buy:.40,cart:.25,learn:.10}}
+};
+let probs = JSON.parse(JSON.stringify(PRESETS.default));
+let bandit, current, rng, simArms, regHist, played, lastVisit, logLines;
+let running=false, timer=null;
+
+function allValid(){ return DESIGNS.every(d=>rowValid(probs[d])); }
+function trueMeans(){ return DESIGNS.map(d=>trueMean(probs[d])); }
+function regretNow(){ return regHist[regHist.length-1]; }
+
+function resetAll(){
+  stopRun();
+  bandit = makeBandit(DESIGNS.length);
+  rng = makeRng((Math.random()*2**32)>>>0);
+  simArms = []; regHist = [0]; played = 0; lastVisit = null; logLines = [];
+  nextVisitor();
+  logLine('Reset: no visitor yet, all counts are 0.');
+  render();
+}
+
+function nextVisitor(){ current = choose(bandit); }
+
+function serve(option, simulated){    // the current visitor picks an option
+  const a = current.a, r = REWARD[option];
+  const t0 = bandit.t, u0 = current.warmup ? null : ucb(bandit,a);
+  update(bandit,a,r);
+  if(simulated){                      // regret only for simulated visitors (the table is their truth)
+    simArms.push(a);
+    const mus = trueMeans();
+    regHist.push(regretNow() + Math.max(...mus) - mus[a]);
+  } else played++;
+  lastVisit = {k:bandit.t, a, option, r, simulated};
+  const d = DESIGNS[a];
+  const why = current.warmup ? 'warm-up'
+                             : `UCB<sub>${d}</sub> = ${u0.toFixed(3)} was the highest at t = ${t0}`;
+  logLine(`Visitor ${bandit.t} (${simulated?'simulated':'you'}) saw design ${d} (${why}) and chose ${OPTION_NAME[option]}: r = ${r}.`);
+  nextVisitor();
+}
+
+function autoStep(){
+  if(!allValid()) return false;
+  const p = probs[DESIGNS[current.a]];
+  serve(sampleOption(p, rng()), true);
+  return true;
+}
+
+/* =====================================================================
+   DRAWING / UI
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const COLORS = {A:'#2563eb', B:'#dc2626', C:'#16a34a'};
+const SOFT   = {A:'#a9c2f7', B:'#f5b0b0', C:'#a3dfb9'};
+const MUH = '<span class="hat">&mu;</span>';
+const DESIGN_TEXT = {
+  A:{tag:'FREE SHIPPING', head:'Get it fast, ship it free.', sub:'Free shipping on every order, no minimum.'},
+  B:{tag:'20% OFF TODAY', head:'Today only: 20% off everything.', sub:'The discount is applied at checkout, no code needed.'},
+  C:{tag:'NEW ARRIVALS',  head:'New arrivals, just for you.', sub:'Fresh picks every week, curated to your style.'}
+};
+const fmt = x => x.toFixed(3);
+const isAuto = () => document.body.classList.contains('auto');
+
+function logLine(s){ logLines.unshift(s); if(logLines.length>200) logLines.pop(); }
+
+function whyHtml(){
+  const e = explainChoice(bandit), d = DESIGNS[e.a];
+  if(e.warmup)
+    return `<b>Why design ${d}?</b> Warm-up: n<sub>${d}</sub> = 0, so design ${d} was never shown. ` +
+           `UCB1 first shows every design once, in order A, B, C.`;
+  // use more decimals if 3 decimals would make different values look equal
+  let dec = 3;
+  const show = (x,k)=>x.toFixed(k);
+  while(dec<6 && e.ucbs.some((v,i)=>i!==e.a && v!==e.ucbs[e.a] && show(v,dec)===show(e.ucbs[e.a],dec))) dec++;
+  const others = DESIGNS.map((dd,i)=>i===e.a?null:`UCB<sub>${dd}</sub> = ${show(e.ucbs[i],dec)}`).filter(Boolean).join(', ');
+  if(e.ties.length){
+    const set = [e.a, ...e.ties];
+    const tied = set.map(i=>`UCB<sub>${DESIGNS[i]}</sub>`).join(' = ');
+    const rest = DESIGNS.map((dd,i)=>set.includes(i)?null:`UCB<sub>${dd}</sub> = ${show(e.ucbs[i],dec)}`).filter(Boolean).join(', ');
+    return `<b>Why design ${d}?</b> At t = ${e.t}, ${tied} = ${show(e.ucbs[e.a],dec)} is a tie for the highest${rest?` (${rest})`:''}. ` +
+           `Ties go to the first design, so ${d}.`;
+  }
+  return `<b>Why design ${d}?</b> At t = ${e.t}, UCB<sub>${d}</sub> = ${show(e.ucbs[e.a],dec)} is the highest (${others}).`;
+}
+
+function render(){
+  const a = current.a, d = DESIGNS[a], auto = isAuto();
+  // website
+  $('site').className = 'site d'+d;
+  $('dlabel').textContent = 'Design '+d;
+  $('tag').textContent = DESIGN_TEXT[d].tag;
+  $('headline').textContent = DESIGN_TEXT[d].head;
+  $('sub').textContent = DESIGN_TEXT[d].sub;
+  $('visitorLabel').textContent = `Visitor ${bandit.t+1} sees design ${d}`;
+  document.querySelectorAll('.opt').forEach(btn=>{ btn.disabled = auto; });
+  $('modeHint').textContent = auto ? 'Visitors are simulated from the hidden truth' : 'You are the visitor: pick one option';
+  $('why').innerHTML = whyHtml();
+  $('last').innerHTML = lastVisit
+    ? `Previous: visitor ${lastVisit.k} (${lastVisit.simulated?'simulated':'you'}) saw design ${DESIGNS[lastVisit.a]} and chose ${OPTION_NAME[lastVisit.option]}, so r = ${lastVisit.r}.`
+    : 'No visitors yet.';
+
+  // UCB table
+  $('tval').textContent = bandit.t;
+  $('ucbTable').querySelector('tbody').innerHTML = DESIGNS.map((dd,i)=>`
+    <tr class="${i===a?'next':''}">
+      <td><span class="chip" style="background:${COLORS[dd]}"></span>${dd}${i===a?'<span class="badge">shown now</span>':''}</td>
+      <td>${bandit.n[i]}</td>
+      ${bandit.n[i] ? `<td>${fmt(muHat(bandit,i))}</td><td>${fmt(bonus(bandit,i))}</td><td>${fmt(ucb(bandit,i))}</td>`
+                    : `<td colspan="3" class="none">not shown yet</td>`}
+    </tr>`).join('');
+
+  // pseudocode highlight
+  const hl = current.warmup ? [1,2] : [7,8,9];
+  document.querySelectorAll('#code > span').forEach(s=>s.classList.toggle('hl', hl.includes(+s.dataset.l)));
+
+  // log
+  $('log').innerHTML = logLines.slice(0,60).map(s=>`<div>${s}</div>`).join('');
+
+  if(auto){ drawUcb(); drawRegret(); }
+}
+
+/* ---------- probability table ---------- */
+function buildPTable(){
+  $('ptBody').innerHTML = DESIGNS.map(d=>`
+    <tr data-d="${d}">
+      <td><span class="chip" style="background:${COLORS[d]}"></span>${d}</td>
+      ${['buy','cart','learn'].map(o=>`<td><input type="number" step="0.01" min="0" max="1" data-o="${o}" value="${probs[d][o]}" aria-label="Design ${d}, ${OPTION_NAME[o]} probability"></td>`).join('')}
+      <td class="leave"></td><td class="mu"></td>
+    </tr>`).join('');
+  $('ptBody').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{
+    const d = inp.closest('tr').dataset.d;
+    probs[d][inp.dataset.o] = inp.value.trim()==='' ? NaN : Number(inp.value);
+    refreshPTable();
+  }));
+  refreshPTable();
+}
+function refreshPTable(){
+  const bad=[];
+  $('ptBody').querySelectorAll('tr').forEach(tr=>{
+    const d=tr.dataset.d, p=probs[d], ok=rowValid(p);
+    tr.querySelectorAll('input').forEach(i=>i.classList.toggle('bad',!ok));
+    const leave = 1-(p.buy+p.cart+p.learn);
+    tr.querySelector('.leave').textContent = ok ? Math.max(0,leave).toFixed(2) : '?';
+    tr.querySelector('.leave').classList.toggle('bad',!ok);
+    tr.querySelector('.mu').textContent = ok ? trueMean(p).toFixed(3) : '?';
+    if(!ok) bad.push(d);
+  });
+  $('ptErr').textContent = bad.length
+    ? `Row ${bad.join(', ')}: each value must be a number from 0 to 1, and Buy + Cart + Learn must be at most 1. Simulation is paused until this is fixed.`
+    : '';
+  ['btnStep','btnRun','btn100','btn1000'].forEach(id=>$(id).disabled = bad.length>0);
+  if(bad.length) stopRun();
+  else regHist = regretHistory(simArms, trueMeans());   // the truth changed: recompute rho with the new mu_a
+  render();
+}
+
+/* ---------- charts ---------- */
+function prepCanvas(c){
+  const r = window.devicePixelRatio||1, w=c.clientWidth, h=c.clientHeight;
+  const W = Math.round(w*r), H = Math.round(h*r);
+  if(c.width!==W || c.height!==H){ c.width=W; c.height=H; }
+  const g=c.getContext('2d'); g.setTransform(r,0,0,r,0,0); g.clearRect(0,0,w,h);
+  g.textBaseline='alphabetic'; g.textAlign='left';
+  return {g,w,h};
+}
+function niceAxis(max){               // round axis maximum with 4 or 5 even ticks
+  const raw = max/4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1,2,2.5,5,10].map(m=>m*p).find(s=>s>=raw);
+  return {step, max: Math.ceil(max/step - 1e-9)*step};
+}
+function tickText(v, step){ const dec = step>=1 ? 0 : step>=0.1 && Math.abs(step*10-Math.round(step*10))<1e-9 ? 1 : 2; return v.toFixed(dec); }
+function drawGrid(g, pad, w, H, ax){
+  g.font='14px system-ui'; g.lineWidth=1; g.strokeStyle='#e2e8f0'; g.fillStyle='#4f5f76'; g.textAlign='right';
+  for(let v=0; v<=ax.max+1e-9; v+=ax.step){
+    const y = pad.t+H-H*v/ax.max;
+    g.beginPath(); g.moveTo(pad.l,y); g.lineTo(w-pad.r,y); g.stroke();
+    g.fillText(tickText(v,ax.step), pad.l-6, y+5);
+  }
+  g.textAlign='left';
+}
+function drawUcb(){
+  const {g,w,h} = prepCanvas($('cUcb'));
+  const pad={l:46,r:12,t:38,b:44}, W=w-pad.l-pad.r, H=h-pad.t-pad.b;
+  const valid = allValid();
+  const vals = DESIGNS.map((d,i)=>({mu:muHat(bandit,i), bo:bonus(bandit,i), tm: valid?trueMean(probs[d]):null}));
+  const ax = niceAxis(Math.max(1, ...vals.map(v=>v.mu!==null? v.mu+v.bo : 0)));
+  drawGrid(g, pad, w, H, ax);
+  const bw = Math.min(110, W/DESIGNS.length*0.5);
+  const Y = val => pad.t+H-H*val/ax.max;
+  DESIGNS.forEach((d,i)=>{
+    const cx = pad.l + W*(i+0.5)/DESIGNS.length, x = cx - bw/2, v=vals[i];
+    g.textAlign='center';
+    if(v.mu!==null){
+      g.fillStyle=COLORS[d]; g.fillRect(x,Y(v.mu),bw,pad.t+H-Y(v.mu));
+      g.fillStyle=SOFT[d];   g.fillRect(x,Y(v.mu+v.bo),bw,Y(v.mu)-Y(v.mu+v.bo));
+      g.strokeStyle=COLORS[d]; g.lineWidth=1.5; g.strokeRect(x+.75,Y(v.mu+v.bo)+.75,bw-1.5,pad.t+H-Y(v.mu+v.bo)-1.5);
+      g.fillStyle='#14213d'; g.font='bold 15px system-ui';
+      g.fillText((v.mu+v.bo).toFixed(3), cx, Y(v.mu+v.bo)-6);
+    } else {
+      g.fillStyle='#4f5f76'; g.font='italic 14px system-ui';
+      g.fillText('not shown yet', cx, pad.t+H-8);
+    }
+    if(v.tm!==null){ g.strokeStyle='#000'; g.lineWidth=3; g.beginPath(); g.moveTo(x-8,Y(v.tm)); g.lineTo(x+bw+8,Y(v.tm)); g.stroke(); g.lineWidth=1; }
+    const top = v.mu!==null ? Y(v.mu+v.bo)-6 : pad.t+H-8;
+    if(i===current.a){                // marked with text, not only color
+      g.fillStyle='#9a4a00'; g.font='bold 14px system-ui';
+      g.fillText('▼ shown next', cx, top-20);
+    }
+    g.fillStyle='#14213d'; g.font='bold 16px system-ui';
+    g.fillText(d, cx, h-pad.b+20);
+    g.fillStyle='#4f5f76'; g.font='14px system-ui';
+    g.fillText(`n = ${bandit.n[i]}`, cx, h-pad.b+37);
+  });
+  g.textAlign='left';
+}
+function drawRegret(){
+  const {g,w,h} = prepCanvas($('cReg'));
+  const pad={l:52,r:16,t:16,b:46}, W=w-pad.l-pad.r, H=h-pad.t-pad.b;
+  if(!allValid()){
+    g.fillStyle='#b91c1c'; g.font='bold 15px system-ui'; g.textAlign='center';
+    g.fillText('Fix the table above to see the regret.', w/2, h/2); g.textAlign='left';
+    $('regStat').innerHTML = '';
+    return;
+  }
+  const T = regHist.length-1, ax = niceAxis(Math.max(1, regretNow()));   // regret never decreases
+  drawGrid(g, pad, w, H, ax);
+  g.fillStyle='#4f5f76'; g.font='14px system-ui';
+  g.fillText('0', pad.l, h-pad.b+20);
+  g.textAlign='right'; g.fillText(String(T), w-pad.r, h-pad.b+20);
+  g.textAlign='center'; g.fillText('t (simulated visitors)', pad.l+W/2, h-pad.b+38);
+  g.textAlign='left';
+  if(T>0){
+    g.strokeStyle='#6d28d9'; g.lineWidth=2.5; g.lineJoin='round'; g.beginPath();
+    const step = Math.max(1, Math.floor(T/800));
+    for(let i=0;i<=T;i+=step){ const x=pad.l+W*i/T, y=pad.t+H-H*regHist[i]/ax.max; i?g.lineTo(x,y):g.moveTo(x,y); }
+    g.lineTo(pad.l+W, pad.t+H-H*regHist[T]/ax.max); g.stroke(); g.lineWidth=1;
+  }
+  const mus = trueMeans(), best = Math.max(...mus);
+  let s = `&rho;(${T}) = ${regretNow().toFixed(2)} after ${T} simulated visitor${T===1?'':'s'}. &nbsp;Best design: <b>${DESIGNS[mus.indexOf(best)]}</b> (&mu;* = ${best.toFixed(3)}).`;
+  if(played) s += `<br>The ${played} visitor${played===1?'':'s'} you played yourself ${played===1?'is':'are'} not counted.`;
+  $('regStat').innerHTML = s;
+}
+
+/* ---------- controls ---------- */
+function setMode(auto){
+  if(!auto) stopRun();
+  document.body.classList.toggle('auto', auto);
+  $('modePlay').classList.toggle('on', !auto);  $('modePlay').setAttribute('aria-pressed', String(!auto));
+  $('modeAuto').classList.toggle('on', auto);   $('modeAuto').setAttribute('aria-pressed', String(auto));
+  render();
+}
+function stopRun(){ running=false; if(timer){clearInterval(timer); timer=null;} $('btnRun').textContent='Run'; }
+function startRun(){
+  if(!allValid() || !isAuto()) return;
+  stopRun();
+  running=true; $('btnRun').textContent='Pause';
+  const sp = Math.min(60, Math.max(1, +$('speed').value || 8));
+  timer = setInterval(()=>{ if(!autoStep()){ stopRun(); } render(); }, 1000/sp);
+}
+function bulk(N){ for(let i=0;i<N;i++) if(!autoStep()) break; render(); }
+
+$('modePlay').onclick = ()=>setMode(false);
+$('modeAuto').onclick = ()=>setMode(true);
+$('btnReset').onclick = ()=>resetAll();
+document.querySelectorAll('.opt').forEach(btn=>btn.addEventListener('click',()=>{
+  if(isAuto()) return;
+  serve(btn.dataset.opt, false); render();
+}));
+$('btnStep').onclick = ()=>{ if(autoStep()) render(); };
+$('btnRun').onclick  = ()=> running ? stopRun() : startRun();
+$('btn100').onclick  = ()=>bulk(100);
+$('btn1000').onclick = ()=>bulk(1000);
+$('speed').oninput   = ()=>{ $('speedVal').textContent=$('speed').value; if(running) startRun(); };
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
+  probs = JSON.parse(JSON.stringify(PRESETS[b.dataset.preset]));   // a new truth: start a new experiment
+  resetAll(); buildPTable();
+});
+let resizeQueued=false;
+window.addEventListener('resize', ()=>{ if(!resizeQueued){ resizeQueued=true; requestAnimationFrame(()=>{ resizeQueued=false; render(); }); } });
+
+/* expose logic for testing */
+window.MAB = {makeBandit, choose, update, muHat, bonus, ucb, explainChoice, sampleOption, trueMean, makeRng, rowValid, regretHistory,
+              get state(){ return {bandit, current, regret: regretNow(), regHist, simArms, played, probs, running}; }};
+
+resetAll();
+buildPTable();
+</script>
+</body>
+</html>
